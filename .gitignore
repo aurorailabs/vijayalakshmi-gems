@@ -1,0 +1,9 @@
+node_modules
+dist
+.expo
+.expo-shared
+server/data/*.db
+server/data/*.db-*
+.env
+*.log
+.DS_Store

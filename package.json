@@ -1,0 +1,9 @@
+{
+  "name": "vijayalakshmi-gems",
+  "private": true,
+  "scripts": {
+    "server": "npm start --prefix server",
+    "portal": "npm run dev --prefix portal",
+    "mobile": "npm start --prefix mobile"
+  }
+}

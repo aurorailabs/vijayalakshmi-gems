@@ -1,0 +1,17 @@
+{
+  "name": "vijayalakshmi-gems-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "reset": "rm -f data/vijayalakshmi.db data/vijayalakshmi.db-shm data/vijayalakshmi.db-wal && node src/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
