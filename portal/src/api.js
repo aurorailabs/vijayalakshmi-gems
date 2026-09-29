@@ -1,4 +1,5 @@
 const KEY = "vg_portal_token";
+const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 export function getToken() {
   return localStorage.getItem(KEY);
@@ -14,7 +15,7 @@ export async function api(path, { method = "GET", body } = {}) {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const response = await fetch(path, {
+  const response = await fetch(`${API_URL}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
