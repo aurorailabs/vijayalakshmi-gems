@@ -16,7 +16,7 @@ import {
   signUser,
   tooManyAttempts,
 } from "./auth.js";
-import { db, getSettings, many, one, run, setSetting } from "./db.js";
+import { db, getSettings, many, migrate, one, run, setSetting } from "./db.js";
 import {
   ASSIGNABLE_FEATURES,
   ASSIGNABLE_MENUS,
@@ -32,7 +32,9 @@ import {
   shopOwnsReview,
 } from "./desk.js";
 import { PAYMENTS, SHIPPING, paymentMethod, quoteTotals, shippingMethod, taxPercent } from "./commerce.js";
+import { dressWindows } from "./merchandising.js";
 import { buildRecommendation } from "./recommend.js";
+import { seed } from "./seed.js";
 
 const app = express();
 app.use(cors());
@@ -331,6 +333,10 @@ function flags(body, keys) {
   }
   return out;
 }
+
+app.get("/", (_req, res) => {
+  res.json({ ok: true, service: "vijayalakshmi-gems" });
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "vijayalakshmi-gems" });
@@ -1554,5 +1560,9 @@ app.use((error, _req, res, _next) => {
   if (status >= 500) console.error(error);
   res.status(status).json({ error: error.message || "Something went wrong." });
 });
+
+migrate();
+seed();
+dressWindows();
 
 export default app;

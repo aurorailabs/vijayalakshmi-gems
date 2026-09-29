@@ -5,7 +5,9 @@ import { phoneKey } from "./auth.js";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, "..", "data");
+const dataDir = process.env.VERCEL
+  ? path.join("/tmp", "vijayalakshmi-gems")
+  : path.join(__dirname, "..", "data");
 fs.mkdirSync(dataDir, { recursive: true });
 
 export const db = new DatabaseSync(path.join(dataDir, "vijayalakshmi.db"));
