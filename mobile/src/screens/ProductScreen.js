@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
-import { api, money } from "../api";
+import { api, formProblem, money } from "../api";
 import { useStore } from "../store";
 import { Button, GemCard, Screen, colors, useShopWidth } from "../ui";
 
@@ -15,6 +15,7 @@ export default function ProductScreen({ navigation, route }) {
   const [review, setReview] = useState({ rating: "5", title: "", body: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [reviewProblem, setReviewProblem] = useState(null);
 
   useEffect(() => {
     let live = true;
@@ -47,6 +48,7 @@ export default function ProductScreen({ navigation, route }) {
 
   async function sendReview() {
     setError("");
+    setReviewProblem(null);
     try {
       await api(`/api/products/${route.params.slug}/reviews`, {
         method: "POST",
@@ -57,7 +59,7 @@ export default function ProductScreen({ navigation, route }) {
       setReview({ rating: "5", title: "", body: "" });
       setMessage("Your review is on the piece.");
     } catch (err) {
-      setError(err.message);
+      setReviewProblem(formProblem(err));
     }
   }
 
@@ -149,11 +151,13 @@ export default function ProductScreen({ navigation, route }) {
         <View style={{ marginTop: 12 }}>
           <TextInput value={review.title} onChangeText={(value) => setReview({ ...review, title: value })} placeholder="Title" placeholderTextColor={colors.muted} style={styles.reviewInput} />
           <TextInput value={review.body} onChangeText={(value) => setReview({ ...review, body: value })} placeholder="What should the next buyer know?" placeholderTextColor={colors.muted} style={styles.reviewInput} multiline />
+          {reviewProblem?.field === "body" ? <Text style={styles.error}>{reviewProblem.message}</Text> : null}
           <View style={styles.secondary}>
             {["1", "2", "3", "4", "5"].map((score) => (
               <Button key={score} ghost={review.rating !== score} label={score} onPress={() => setReview({ ...review, rating: score })} />
             ))}
           </View>
+          {reviewProblem?.field === "rating" ? <Text style={styles.error}>{reviewProblem.message}</Text> : null}
           <Button label="Publish review" onPress={sendReview} />
         </View>
       ) : (

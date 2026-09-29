@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { api } from "../api";
+import { api, formProblem } from "../api";
 import { useStore } from "../store";
 import { Button, Screen, Title, colors } from "../ui";
 
@@ -17,7 +17,7 @@ export default function AuthScreen({ navigation, route }) {
   const { signIn } = useStore();
   const [mode, setMode] = useState(route.params?.mode === "register" ? "register" : "login");
   const [form, setForm] = useState({ name: "", identifier: "", email: "", password: "", phone: "" });
-  const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -28,27 +28,27 @@ export default function AuthScreen({ navigation, route }) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function problem() {
+  function invalid() {
     if (mode === "login") {
       const identifier = form.identifier.trim();
-      if (!identifier) return "Enter your email or phone number.";
-      if (identifier.includes("@") && !EMAIL.test(identifier)) return "Enter a valid email.";
-      if (!identifier.includes("@") && phoneDigits(identifier).length < 10) return "Enter a valid phone number.";
-      return form.password ? "" : "Enter your password.";
+      if (!identifier) return { field: "identifier", message: "Enter your email or phone number." };
+      if (identifier.includes("@") && !EMAIL.test(identifier)) return { field: "identifier", message: "Enter a valid email." };
+      if (!identifier.includes("@") && phoneDigits(identifier).length < 10) return { field: "identifier", message: "Enter a valid phone number." };
+      return form.password ? null : { field: "password", message: "Enter your password." };
     }
-    if (form.name.trim().length < 2) return "Enter your name.";
-    if (!EMAIL.test(form.email.trim())) return "Enter a valid email.";
-    if (phoneDigits(form.phone).length < 10) return "Enter a valid phone number.";
+    if (form.name.trim().length < 2) return { field: "name", message: "Enter your name." };
+    if (!EMAIL.test(form.email.trim())) return { field: "email", message: "Enter a valid email." };
+    if (phoneDigits(form.phone).length < 10) return { field: "phone", message: "Enter a valid phone number." };
     if (form.password.length < 8 || !/[A-Za-z]/.test(form.password) || !/[0-9]/.test(form.password)) {
-      return "Use at least 8 characters, with letters and a number.";
+      return { field: "password", message: "Password must be at least 8 characters and include a letter and a number." };
     }
-    return "";
+    return null;
   }
 
   async function submit() {
-    const message = problem();
-    setError(message);
-    if (message || busy) return;
+    const found = invalid();
+    setProblem(found);
+    if (found || busy) return;
     setBusy(true);
     try {
       const path = mode === "login" ? "/api/auth/login" : "/api/auth/register";
@@ -60,7 +60,7 @@ export default function AuthScreen({ navigation, route }) {
       if (navigation.canGoBack()) navigation.goBack();
       else navigation.navigate("Main", { screen: "Account" });
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setBusy(false);
     }
@@ -75,10 +75,12 @@ export default function AuthScreen({ navigation, route }) {
         {mode === "login" ? "Sign in" : "Create an account"}
       </Title>
       {mode === "register" ? (
-        <Field label="Name" value={form.name} onChangeText={(value) => set("name", value)} autoComplete="name" textContentType="name" />
+        <Field name="name" problem={problem} label="Name" value={form.name} onChangeText={(value) => set("name", value)} autoComplete="name" textContentType="name" />
       ) : null}
       {mode === "login" ? (
         <Field
+          name="identifier"
+          problem={problem}
           label="Email or phone"
           value={form.identifier}
           onChangeText={(value) => set("identifier", value)}
@@ -90,6 +92,8 @@ export default function AuthScreen({ navigation, route }) {
         />
       ) : (
         <Field
+          name="email"
+          problem={problem}
           label="Email"
           value={form.email}
           onChangeText={(value) => set("email", value)}
@@ -101,6 +105,8 @@ export default function AuthScreen({ navigation, route }) {
         />
       )}
       <Field
+        name="password"
+        problem={problem}
         label="Password"
         value={form.password}
         onChangeText={(value) => set("password", value)}
@@ -110,13 +116,13 @@ export default function AuthScreen({ navigation, route }) {
         textContentType={mode === "login" ? "password" : "newPassword"}
       />
       {mode === "register" ? (
-        <Field label="Phone" value={form.phone} onChangeText={(value) => set("phone", value)} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" />
+        <Field name="phone" problem={problem} label="Phone" value={form.phone} onChangeText={(value) => set("phone", value)} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" />
       ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {problem?.message && !problem.field ? <Text style={styles.error}>{problem.message}</Text> : null}
       <Button label={busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"} onPress={submit} disabled={busy} />
       <Pressable
         onPress={() => {
-          setError("");
+          setProblem(null);
           setMode(mode === "login" ? "register" : "login");
         }}
         style={styles.switch}
@@ -129,11 +135,13 @@ export default function AuthScreen({ navigation, route }) {
   );
 }
 
-function Field({ label, ...props }) {
+function Field({ label, name, problem, ...props }) {
+  const message = problem?.field === name ? problem.message : "";
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput {...props} accessibilityLabel={label} style={styles.input} placeholderTextColor={colors.muted} />
+      {message ? <Text style={styles.error}>{message}</Text> : null}
     </View>
   );
 }

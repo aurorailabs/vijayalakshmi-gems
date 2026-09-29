@@ -36,13 +36,13 @@ export function isPhone(value) {
 }
 
 export function registrationError({ name, email, password, phone }) {
-  if (!String(name || "").trim() || String(name).trim().length < 2) return "Enter your name.";
-  if (!isEmail(email)) return "Enter a valid email.";
-  if (!isPhone(phone)) return "Enter a valid phone number.";
+  if (!String(name || "").trim() || String(name).trim().length < 2) return { field: "name", error: "Enter your name." };
+  if (!isEmail(email)) return { field: "email", error: "Enter a valid email." };
+  if (!isPhone(phone)) return { field: "phone", error: "Enter a valid phone number." };
   if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || password.length < 8) {
-    return "Use at least 8 characters, with letters and a number.";
+    return { field: "password", error: "Password must be at least 8 characters and include a letter and a number." };
   }
-  return "";
+  return null;
 }
 
 export function signUser(user) {

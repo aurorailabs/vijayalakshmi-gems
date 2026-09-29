@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { api } from "../api";
+import { api, formProblem } from "../api";
 import { useStore } from "../store";
 import { Button, Screen, Title, colors } from "../ui";
 
@@ -153,10 +153,12 @@ export function EnquireScreen({ route }) {
   });
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
   const type = route.params?.type || "expert";
 
   async function send() {
     setError("");
+    setProblem(null);
     try {
       await api("/api/enquiries", {
         method: "POST",
@@ -164,7 +166,7 @@ export function EnquireScreen({ route }) {
       });
       setDone(true);
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     }
   }
 
@@ -173,9 +175,12 @@ export function EnquireScreen({ route }) {
     <Screen>
       <Title kicker={type.replace(/_/g, " ")} sub={route.params?.productName || "Tell us what you need."}>Write to the desk</Title>
       {["name", "phone", "email", "message"].map((key) => (
-        <TextInput key={key} value={form[key]} onChangeText={(value) => setForm({ ...form, [key]: value })} placeholder={key} style={styles.input} placeholderTextColor={colors.muted} multiline={key === "message"} />
+        <View key={key}>
+          <TextInput value={form[key]} onChangeText={(value) => setForm({ ...form, [key]: value })} placeholder={key} style={styles.input} placeholderTextColor={colors.muted} multiline={key === "message"} />
+          {problem?.field === key ? <Text style={styles.error}>{problem.message}</Text> : null}
+        </View>
       ))}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error || (problem?.message && !problem.field) ? <Text style={styles.error}>{error || problem.message}</Text> : null}
       <Button label="Send" onPress={send} />
     </Screen>
   );

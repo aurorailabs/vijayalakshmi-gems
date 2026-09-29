@@ -349,12 +349,12 @@ app.post("/api/auth/register", (req, res) => {
   const phone = String(req.body.phone || "").trim();
   const key = phoneKey(phone);
   const problem = registrationError({ name, email, password, phone });
-  if (problem) return res.status(400).json({ error: problem });
+  if (problem) return res.status(400).json({ error: problem.error, field: problem.field });
   if (one("SELECT id FROM users WHERE email = ?", email)) {
-    return res.status(409).json({ error: "An account with that email already exists." });
+    return res.status(409).json({ error: "An account with that email already exists.", field: "email" });
   }
   if (one("SELECT id FROM users WHERE phone_key = ?", key)) {
-    return res.status(409).json({ error: "An account with that phone number already exists." });
+    return res.status(409).json({ error: "An account with that phone number already exists.", field: "phone" });
   }
   const id = run(
     "INSERT INTO users (name, email, phone, phone_key, password_hash, role) VALUES (?, ?, ?, ?, ?, 'customer')",
@@ -398,11 +398,11 @@ app.patch("/api/auth/profile", requireUser, (req, res) => {
   if (!current) return res.status(401).json({ error: "Sign in required" });
   const name = String(req.body.name || current.name).trim();
   const phone = String(req.body.phone ?? current.phone ?? "").trim();
-  if (name.length < 2) return res.status(400).json({ error: "Enter your name." });
-  if (phone && !isPhone(phone)) return res.status(400).json({ error: "Enter a valid phone number." });
+  if (name.length < 2) return res.status(400).json({ error: "Enter your name.", field: "name" });
+  if (phone && !isPhone(phone)) return res.status(400).json({ error: "Enter a valid phone number.", field: "phone" });
   const key = phone ? phoneKey(phone) : "";
   const taken = key ? one("SELECT id FROM users WHERE phone_key = ? AND id != ?", key, current.id) : null;
-  if (taken) return res.status(409).json({ error: "An account with that phone number already exists." });
+  if (taken) return res.status(409).json({ error: "An account with that phone number already exists.", field: "phone" });
   run("UPDATE users SET name = ?, phone = ?, phone_key = ? WHERE id = ?", name, phone, key || null, current.id);
   res.json({ user: publicUser(one("SELECT * FROM users WHERE id = ?", current.id)) });
 });
@@ -411,10 +411,10 @@ app.post("/api/auth/password", requireUser, (req, res) => {
   const current = one("SELECT * FROM users WHERE id = ?", req.user.id);
   const next = String(req.body.password || "");
   if (!current || !checkPassword(String(req.body.current || ""), current.password_hash)) {
-    return res.status(401).json({ error: "The current password is incorrect." });
+    return res.status(401).json({ error: "The current password is incorrect.", field: "current" });
   }
   if (next.length < 8 || !/[A-Za-z]/.test(next) || !/[0-9]/.test(next)) {
-    return res.status(400).json({ error: "Use at least 8 characters, with letters and a number." });
+    return res.status(400).json({ error: "Password must be at least 8 characters and include a letter and a number.", field: "password" });
   }
   run("UPDATE users SET password_hash = ? WHERE id = ?", hashPassword(next), current.id);
   res.json({ ok: true });
@@ -473,8 +473,8 @@ app.post("/api/products/:slug/reviews", requireUser, (req, res) => {
   const rating = Number(req.body.rating);
   const body = String(req.body.body || "").trim();
   const title = String(req.body.title || "").trim();
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: "Choose a rating from 1 to 5." });
-  if (body.length < 8) return res.status(400).json({ error: "Write a few words about the piece." });
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: "Choose a rating from 1 to 5.", field: "rating" });
+  if (body.length < 8) return res.status(400).json({ error: "Write a few words about the piece.", field: "body" });
   const bought = one(
     `SELECT oi.id FROM order_items oi JOIN orders o ON o.id = oi.order_id
      WHERE o.user_id = ? AND oi.product_id = ? AND o.status != 'cancelled'`,
@@ -517,7 +517,7 @@ app.post("/api/recommendations", (req, res) => {
   const purpose = String(req.body.purpose || "");
   const weight = req.body.weightKg === "" || req.body.weightKg == null ? null : Number(req.body.weightKg);
   if (!birthDate && !purpose) {
-    return res.status(400).json({ error: "Add a birth date or choose a purpose." });
+    return res.status(400).json({ error: "Add a birth date or choose a purpose.", field: birthDate ? "purpose" : "birthDate" });
   }
   const result = buildRecommendation({ birthDate, purpose, weightKg: weight });
   const currency = currencyFrom(req);
@@ -555,7 +555,7 @@ app.post("/api/enquiries", (req, res) => {
   const type = String(req.body.type || "expert");
   const message = String(req.body.message || "").trim();
   const phone = String(req.body.phone || "").trim();
-  if (!message && !phone) return res.status(400).json({ error: "Leave a phone number or a message." });
+  if (!message && !phone) return res.status(400).json({ error: "Leave a phone number or a message.", field: phone ? "message" : "phone" });
   const product = req.body.productId ? one("SELECT shop_id FROM products WHERE id = ?", req.body.productId) : null;
   const id = run(
     `INSERT INTO enquiries (type, name, phone, email, message, product_id, shop_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -622,9 +622,15 @@ function readAddress(body) {
     postal: String(body.postal || body.postalCode || "").trim(),
     country: String(body.country || "India").trim(),
   };
-  if (!address.name || !address.phone || !address.line1 || !address.city || !address.postal || !address.country) {
-    return { error: "Name, phone, address, city, postal code, and country are required." };
-  }
+  const missing = [
+    ["name", "Enter the name."],
+    ["phone", "Enter the phone number."],
+    ["line1", "Enter the address."],
+    ["city", "Enter the city."],
+    ["postal", "Enter the postal code."],
+    ["country", "Enter the country."],
+  ].find(([key]) => !address[key]);
+  if (missing) return { error: missing[1], field: missing[0] };
   return { address };
 }
 
@@ -635,7 +641,7 @@ app.get("/api/addresses", requireUser, (req, res) => {
 
 app.post("/api/addresses", requireUser, (req, res) => {
   const parsed = readAddress(req.body);
-  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  if (parsed.error) return res.status(400).json({ error: parsed.error, field: parsed.field });
   const address = parsed.address;
   const makeDefault = req.body.isDefault || !one("SELECT id FROM addresses WHERE user_id = ?", req.user.id);
   if (makeDefault) run("UPDATE addresses SET is_default = 0 WHERE user_id = ?", req.user.id);
@@ -780,7 +786,7 @@ app.post("/api/checkout", requireUser, (req, res) => {
   const cart = cartPayload(req.user.id, currency);
   if (!cart.items.length) return res.status(400).json({ error: "Your bag is empty." });
   const parsed = shippingFrom(req);
-  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  if (parsed.error) return res.status(400).json({ error: parsed.error, field: parsed.field });
   const pay = paymentMethod(req.body.paymentMethod || "cod");
   if (!pay) return res.status(400).json({ error: "Choose how you will pay." });
   const totals = quoteTotals({
@@ -951,7 +957,7 @@ app.put("/api/admin/shop", desk, (req, res) => {
   if (!gate(req, res, "settings")) return;
   if (!req.desk.shopId) return res.status(400).json({ error: "This login is not linked to a shop." });
   const name = String(req.body.name || "").trim();
-  if (!name) return res.status(400).json({ error: "Enter the shop name." });
+  if (!name) return res.status(400).json({ error: "Enter the shop name.", field: "name" });
   run(
     "UPDATE shops SET name = ?, city = ?, phone = ? WHERE id = ?",
     name,
@@ -988,22 +994,22 @@ function saveShopOwner(shopId, body, existing) {
   const features = JSON.stringify(cleanFeatures(body.features));
   const roleId = Number(body.roleId);
   const percent = Number(body.commissionPercent);
-  if (!one("SELECT id FROM roles WHERE id = ?", roleId)) return { error: "Choose a role." };
-  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { error: "Enter a percentage from 0 to 100." };
-  if (!name || name.length < 2) return { error: "Enter the owner's name." };
-  if (!isEmail(email)) return { error: "Enter the owner's email." };
-  if (!isPhone(phone)) return { error: "Enter the owner's phone." };
+  if (!one("SELECT id FROM roles WHERE id = ?", roleId)) return { error: "Choose a role.", field: "roleId" };
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { error: "Enter a percentage from 0 to 100.", field: "commissionPercent" };
+  if (!name || name.length < 2) return { error: "Enter the owner's name.", field: "ownerName" };
+  if (!isEmail(email)) return { error: "Enter the owner's email.", field: "email" };
+  if (!isPhone(phone)) return { error: "Enter the owner's phone.", field: "phone" };
   if (!existing && (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || password.length < 8)) {
-    return { error: "Use at least 8 characters, with letters and a number." };
+    return { error: "Password must be at least 8 characters and include a letter and a number.", field: "password" };
   }
   if (password && (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || password.length < 8)) {
-    return { error: "Use at least 8 characters, with letters and a number." };
+    return { error: "Password must be at least 8 characters and include a letter and a number.", field: "password" };
   }
   const key = phoneKey(phone);
   const emailTaken = one("SELECT id FROM users WHERE email = ? AND id != ?", email, existing?.id || 0);
-  if (emailTaken) return { error: "An account with that email already exists." };
+  if (emailTaken) return { error: "An account with that email already exists.", field: "email" };
   const phoneTaken = one("SELECT id FROM users WHERE phone_key = ? AND id != ?", key, existing?.id || 0);
-  if (phoneTaken) return { error: "An account with that phone number already exists." };
+  if (phoneTaken) return { error: "An account with that phone number already exists.", field: "phone" };
   if (existing) {
     run(
       "UPDATE users SET name = ?, email = ?, phone = ?, phone_key = ?, features = ?, role_id = ?, commission_percent = ? WHERE id = ?",
@@ -1087,8 +1093,8 @@ app.get("/api/admin/roles", desk, (req, res) => {
 app.post("/api/admin/roles", desk, (req, res) => {
   if (!isSuper(req.desk)) return res.status(403).json({ error: "Only the super admin can do this." });
   const name = String(req.body.name || "").trim();
-  if (!name) return res.status(400).json({ error: "Enter a role name." });
-  if (one("SELECT id FROM roles WHERE name = ?", name)) return res.status(409).json({ error: "That role name is already used." });
+  if (!name) return res.status(400).json({ error: "Enter a role name.", field: "name" });
+  if (one("SELECT id FROM roles WHERE name = ?", name)) return res.status(409).json({ error: "That role name is already used.", field: "name" });
   const id = run("INSERT INTO roles (name, menus) VALUES (?, ?)", name, JSON.stringify(cleanMenus(req.body.menus))).id;
   res.status(201).json({ role: presentRole(one("SELECT * FROM roles WHERE id = ?", id)) });
 });
@@ -1098,9 +1104,9 @@ app.patch("/api/admin/roles/:id", desk, (req, res) => {
   const role = one("SELECT * FROM roles WHERE id = ?", Number(req.params.id));
   if (!role) return res.status(404).json({ error: "Role not found." });
   const name = String(req.body.name || role.name).trim();
-  if (!name) return res.status(400).json({ error: "Enter a role name." });
+  if (!name) return res.status(400).json({ error: "Enter a role name.", field: "name" });
   const taken = one("SELECT id FROM roles WHERE name = ? AND id != ?", name, role.id);
-  if (taken) return res.status(409).json({ error: "That role name is already used." });
+  if (taken) return res.status(409).json({ error: "That role name is already used.", field: "name" });
   run("UPDATE roles SET name = ?, menus = ? WHERE id = ?", name, JSON.stringify(cleanMenus(req.body.menus)), role.id);
   res.json({ role: presentRole(one("SELECT * FROM roles WHERE id = ?", role.id)) });
 });
@@ -1118,7 +1124,7 @@ app.delete("/api/admin/roles/:id", desk, (req, res) => {
 app.post("/api/admin/shops", desk, (req, res) => {
   if (!gate(req, res, "shops", { superOnly: true })) return;
   const name = String(req.body.name || "").trim();
-  if (!name) return res.status(400).json({ error: "Enter the shop name." });
+  if (!name) return res.status(400).json({ error: "Enter the shop name.", field: "name" });
   let slug = slugify(req.body.slug || name) || `shop-${Date.now()}`;
   if (one("SELECT id FROM shops WHERE slug = ?", slug)) slug = `${slug}-${Date.now()}`;
   const shopId = run(
@@ -1132,7 +1138,7 @@ app.post("/api/admin/shops", desk, (req, res) => {
   const saved = saveShopOwner(shopId, req.body, null);
   if (saved.error) {
     run("DELETE FROM shops WHERE id = ?", shopId);
-    return res.status(400).json({ error: saved.error });
+    return res.status(400).json({ error: saved.error, field: saved.field });
   }
   res.status(201).json({ shop: presentShop(one("SELECT * FROM shops WHERE id = ?", shopId)) });
 });
@@ -1142,7 +1148,7 @@ app.patch("/api/admin/shops/:id", desk, (req, res) => {
   const shop = one("SELECT * FROM shops WHERE id = ?", Number(req.params.id));
   if (!shop) return res.status(404).json({ error: "Shop not found." });
   const name = String(req.body.name || shop.name).trim();
-  if (!name) return res.status(400).json({ error: "Enter the shop name." });
+  if (!name) return res.status(400).json({ error: "Enter the shop name.", field: "name" });
   run(
     "UPDATE shops SET name = ?, city = ?, phone = ?, active = ? WHERE id = ?",
     name,
@@ -1153,7 +1159,7 @@ app.patch("/api/admin/shops/:id", desk, (req, res) => {
   );
   const owner = one("SELECT * FROM users WHERE shop_id = ? AND role = 'shop' ORDER BY id LIMIT 1", shop.id);
   const saved = saveShopOwner(shop.id, req.body, owner);
-  if (saved.error) return res.status(400).json({ error: saved.error });
+  if (saved.error) return res.status(400).json({ error: saved.error, field: saved.field });
   res.json({ shop: presentShop(one("SELECT * FROM shops WHERE id = ?", shop.id)) });
 });
 
@@ -1214,15 +1220,18 @@ app.post("/api/admin/products", desk, (req, res) => {
   if (!gate(req, res, "pieces")) return;
   const body = req.body || {};
   const name = String(body.name || "").trim();
-  if (!name) return res.status(400).json({ error: "Name is required." });
+  if (!name) return res.status(400).json({ error: "Enter the product name.", field: "name" });
   if (req.desk.role === "shop" && !req.desk.shopId) return res.status(400).json({ error: "This login is not linked to a shop." });
   if (!kindAllowed(req.desk, body.kind || "loose")) {
     return res.status(403).json({ error: "The super admin has not enabled this for your shop." });
   }
   const slug = slugify(body.slug || name);
   const sku = String(body.sku || `VG-${Date.now()}`).trim();
-  if (one("SELECT id FROM products WHERE slug = ? OR sku = ?", slug, sku)) {
-    return res.status(409).json({ error: "SKU or slug already exists." });
+  if (one("SELECT id FROM products WHERE sku = ?", sku)) {
+    return res.status(409).json({ error: "That SKU is already used.", field: "sku" });
+  }
+  if (one("SELECT id FROM products WHERE slug = ?", slug)) {
+    return res.status(409).json({ error: "That slug is already used.", field: "slug" });
   }
   const id = run(
     `INSERT INTO products (
@@ -1441,9 +1450,10 @@ app.post("/api/admin/:table", desk, (req, res) => {
   if (!gateTable(req, res, req.params.table)) return;
   if (req.params.table === "currencies") {
     const code = String(req.body.code || "").trim().toUpperCase();
-    if (!code || !req.body.name || !req.body.symbol || req.body.rate == null) {
-      return res.status(400).json({ error: "Code, name, symbol, and rate are required." });
-    }
+    if (!code) return res.status(400).json({ error: "Enter the currency code.", field: "code" });
+    if (!req.body.name) return res.status(400).json({ error: "Enter the currency name.", field: "name" });
+    if (!req.body.symbol) return res.status(400).json({ error: "Enter the currency symbol.", field: "symbol" });
+    if (req.body.rate == null || req.body.rate === "") return res.status(400).json({ error: "Enter the rate.", field: "rate" });
     run(
       "INSERT INTO currencies (code, name, symbol, rate, is_default, active, sort_order) VALUES (?, ?, ?, ?, 0, 1, ?)",
       code,

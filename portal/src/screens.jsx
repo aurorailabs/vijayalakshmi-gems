@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "./api.js";
+import { api, formProblem } from "./api.js";
 
 function useItems(path) {
   const [items, setItems] = useState([]);
@@ -23,15 +23,26 @@ function blank(fields) {
   return draft;
 }
 
-function Field({ field, draft, setDraft }) {
+function Labeled({ label, name, problem, className, hint, children }) {
+  const message = problem?.field === name ? problem.message : "";
+  return (
+    <label className={className}>
+      {label}
+      {children}
+      {message ? <span className="error">{message}</span> : hint ? <span className="muted">{hint}</span> : null}
+    </label>
+  );
+}
+
+function Field({ field, draft, setDraft, problem }) {
   const value = draft[field.key] ?? "";
+  const message = problem?.field === field.key ? problem.message : "";
   if (field.type === "check") {
     return (
-      <label className={field.full ? "full" : ""}>
-        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="checkbox" checked={!!Number(value)} onChange={(e) => setDraft({ ...draft, [field.key]: e.target.checked ? 1 : 0 })} />
-          {field.label}
-        </span>
+      <label className={field.full ? "full check" : "check"}>
+        <input type="checkbox" checked={!!Number(value)} onChange={(e) => setDraft({ ...draft, [field.key]: e.target.checked ? 1 : 0 })} />
+        {field.label}
+        {message ? <span className="error">{message}</span> : null}
       </label>
     );
   }
@@ -40,6 +51,7 @@ function Field({ field, draft, setDraft }) {
       <label className="full">
         {field.label}
         <textarea value={value} onChange={(e) => setDraft({ ...draft, [field.key]: e.target.value })} />
+        {message ? <span className="error">{message}</span> : null}
       </label>
     );
   }
@@ -51,6 +63,7 @@ function Field({ field, draft, setDraft }) {
         <select value={value ?? ""} onChange={(e) => setDraft({ ...draft, [field.key]: e.target.value })}>
           {options.map((option) => <option key={String(option.value)} value={String(option.value)}>{option.label}</option>)}
         </select>
+        {message ? <span className="error">{message}</span> : null}
       </label>
     );
   }
@@ -58,6 +71,7 @@ function Field({ field, draft, setDraft }) {
     <label className={field.full ? "full" : ""}>
       {field.label}
       <input type={field.type === "number" ? "number" : field.type === "color" ? "text" : "text"} value={value} onChange={(e) => setDraft({ ...draft, [field.key]: e.target.value })} />
+      {message ? <span className="error">{message}</span> : null}
     </label>
   );
 }
@@ -67,11 +81,13 @@ export function Resource({ title, intro, table, columns, fields }) {
   const resolved = typeof fields === "function" ? fields(items) : fields;
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState(null);
 
   async function save(event) {
     event.preventDefault();
     setSaving(true);
     setError("");
+    setProblem(null);
     const body = {};
     for (const field of resolved) {
       const value = draft[field.key];
@@ -86,7 +102,7 @@ export function Resource({ title, intro, table, columns, fields }) {
       setDraft(null);
       reload();
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setSaving(false);
     }
@@ -108,9 +124,9 @@ export function Resource({ title, intro, table, columns, fields }) {
             <h1>{draft.id ? "Edit" : "Add"}</h1>
           </div>
         </div>
-        {error ? <p className="error">{error}</p> : null}
+        {problem?.message && !problem.field ? <p className="error">{problem.message}</p> : null}
         <form className="panel grid-form" onSubmit={save}>
-          {resolved.map((field) => <Field key={field.key} field={field} draft={draft} setDraft={setDraft} />)}
+          {resolved.map((field) => <Field key={field.key} field={field} draft={draft} setDraft={setDraft} problem={problem} />)}
           <div className="full row-actions">
             <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save"}</button>
           </div>
@@ -203,6 +219,7 @@ export function Pieces({ features = { gemstones: true, jewellery: true } }) {
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState(null);
 
   useEffect(() => {
     api("/api/admin/categories").then((data) => setCategories(data.items)).catch((err) => setError(err.message));
@@ -234,6 +251,12 @@ export function Pieces({ features = { gemstones: true, jewellery: true } }) {
     event.preventDefault();
     setSaving(true);
     setError("");
+    if (!String(draft.name || "").trim()) {
+      setProblem({ field: "name", message: "Enter the product name." });
+      setSaving(false);
+      return;
+    }
+    setProblem(null);
     const body = {
       ...draft,
       categoryId: draft.categoryId ? Number(draft.categoryId) : null,
@@ -251,7 +274,7 @@ export function Pieces({ features = { gemstones: true, jewellery: true } }) {
       setDraft(null);
       reload();
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setSaving(false);
     }
@@ -275,17 +298,17 @@ export function Pieces({ features = { gemstones: true, jewellery: true } }) {
             <h1>{draft.id ? draft.name || "Edit product" : "New product"}</h1>
           </div>
         </div>
-        {error ? <p className="error">{error}</p> : null}
+        {problem?.message && !problem.field ? <p className="error">{problem.message}</p> : null}
         <form className="panel grid-form" onSubmit={save}>
-          <label>Name<input value={draft.name} onChange={(e) => set("name", e.target.value)} required /></label>
-          <label>SKU<input value={draft.sku} onChange={(e) => set("sku", e.target.value)} /></label>
-          <label>Slug<input value={draft.slug} onChange={(e) => set("slug", e.target.value)} /></label>
-          <label>Kind
+          <Labeled label="Name" name="name" problem={problem}><input value={draft.name} onChange={(e) => set("name", e.target.value)} required /></Labeled>
+          <Labeled label="SKU" name="sku" problem={problem}><input value={draft.sku} onChange={(e) => set("sku", e.target.value)} /></Labeled>
+          <Labeled label="Slug" name="slug" problem={problem}><input value={draft.slug} onChange={(e) => set("slug", e.target.value)} /></Labeled>
+          <Labeled label="Kind" name="kind" problem={problem}>
             <select value={draft.kind} onChange={(e) => set("kind", e.target.value)}>
               {features.gemstones ? <option value="loose">Loose stone</option> : null}
               {features.jewellery ? <option value="jewellery">Jewellery</option> : null}
             </select>
-          </label>
+          </Labeled>
           <label>Category
             <select value={draft.categoryId} onChange={(e) => set("categoryId", e.target.value)}>
               <option value="">None</option>
@@ -554,11 +577,17 @@ export function Currencies() {
   const { items, error, reload, setError } = useItems("/api/admin/currencies");
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState(null);
 
   async function save(event) {
     event.preventDefault();
     setSaving(true);
     setError("");
+    if (!String(draft.code || "").trim()) { setProblem({ field: "code", message: "Enter the currency code." }); setSaving(false); return; }
+    if (!String(draft.name || "").trim()) { setProblem({ field: "name", message: "Enter the currency name." }); setSaving(false); return; }
+    if (!String(draft.symbol || "").trim()) { setProblem({ field: "symbol", message: "Enter the currency symbol." }); setSaving(false); return; }
+    if (draft.rate === "" || Number.isNaN(Number(draft.rate))) { setProblem({ field: "rate", message: "Enter the rate." }); setSaving(false); return; }
+    setProblem(null);
     try {
       if (draft.existing) {
         await api(`/api/admin/currencies/${draft.code}`, {
@@ -571,7 +600,7 @@ export function Currencies() {
       setDraft(null);
       reload();
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setSaving(false);
     }
@@ -582,13 +611,13 @@ export function Currencies() {
       <section>
         <button className="ghost back" type="button" onClick={() => setDraft(null)}>Back to currencies</button>
         <div className="top"><div><p className="eyebrow">Money</p><h1>{draft.existing ? draft.code : "New currency"}</h1></div></div>
-        {error ? <p className="error">{error}</p> : null}
+        {problem?.message && !problem.field ? <p className="error">{problem.message}</p> : null}
         <form className="panel grid-form" onSubmit={save}>
-          <label>Code<input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} required disabled={draft.existing} /></label>
-          <label>Name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
-          <label>Symbol<input value={draft.symbol} onChange={(e) => setDraft({ ...draft, symbol: e.target.value })} required /></label>
-          <label>Rate<input type="number" step="0.0001" value={draft.rate} onChange={(e) => setDraft({ ...draft, rate: e.target.value })} required /></label>
-          {draft.existing ? <label><input type="checkbox" checked={!!draft.isDefault} onChange={(e) => setDraft({ ...draft, isDefault: e.target.checked ? 1 : 0 })} /> Default</label> : null}
+          <Labeled label="Code" name="code" problem={problem}><input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} required disabled={draft.existing} /></Labeled>
+          <Labeled label="Name" name="name" problem={problem}><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></Labeled>
+          <Labeled label="Symbol" name="symbol" problem={problem}><input value={draft.symbol} onChange={(e) => setDraft({ ...draft, symbol: e.target.value })} required /></Labeled>
+          <Labeled label="Rate" name="rate" problem={problem}><input type="number" step="0.0001" value={draft.rate} onChange={(e) => setDraft({ ...draft, rate: e.target.value })} required /></Labeled>
+          {draft.existing ? <label className="check"><input type="checkbox" checked={!!draft.isDefault} onChange={(e) => setDraft({ ...draft, isDefault: e.target.checked ? 1 : 0 })} /> Default</label> : null}
           <div className="full"><button className="primary" disabled={saving}>{saving ? "Saving…" : "Save"}</button></div>
         </form>
       </section>
@@ -718,12 +747,30 @@ const emptyShop = {
   active: true,
 };
 
+function shopProblem(draft) {
+  if (!String(draft.name || "").trim()) return { field: "name", message: "Enter the shop name." };
+  if (String(draft.ownerName || "").trim().length < 2) return { field: "ownerName", message: "Enter the owner's name." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(draft.email || "").trim())) return { field: "email", message: "Enter the owner's email." };
+  const digits = String(draft.phone || "").replace(/\D/g, "");
+  const phone = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits.replace(/^0/, "");
+  if (phone.length < 10 || phone.length > 15) return { field: "phone", message: "Enter the owner's phone." };
+  const password = String(draft.password || "");
+  if ((!draft.id || password) && (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password))) {
+    return { field: "password", message: "Password must be at least 8 characters and include a letter and a number." };
+  }
+  if (!draft.roleId) return { field: "roleId", message: "Choose a role." };
+  const percent = Number(draft.commissionPercent);
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { field: "commissionPercent", message: "Enter a percentage from 0 to 100." };
+  return null;
+}
+
 export function Shops() {
   const [items, setItems] = useState([]);
   const [roles, setRoles] = useState([]);
   const [featureList, setFeatureList] = useState([]);
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
   const [saving, setSaving] = useState(false);
 
   function load() {
@@ -740,8 +787,14 @@ export function Shops() {
 
   async function save(event) {
     event.preventDefault();
+    const local = shopProblem(draft);
+    if (local) {
+      setProblem(local);
+      return;
+    }
     setSaving(true);
     setError("");
+    setProblem(null);
     try {
       const body = {
         name: draft.name,
@@ -761,7 +814,7 @@ export function Shops() {
       setDraft(null);
       load();
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setSaving(false);
     }
@@ -778,26 +831,28 @@ export function Shops() {
             <p className="muted">Choose the role for their menus, and the percentage of their sales that is paid to you.</p>
           </div>
         </div>
-        {error ? <p className="error">{error}</p> : null}
+        {problem?.message && !problem.field ? <p className="error">{problem.message}</p> : null}
         <form className="panel grid-form" onSubmit={save}>
-          <label>Shop name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
-          <label>City<input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} /></label>
-          <label>Shop phone<input value={draft.shopPhone} onChange={(e) => setDraft({ ...draft, shopPhone: e.target.value })} /></label>
-          {draft.id ? <label><input type="checkbox" checked={!!draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /> Show in the app</label> : null}
+          <Labeled label="Shop name" name="name" problem={problem}><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></Labeled>
+          <Labeled label="City" name="city" problem={problem}><input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} /></Labeled>
+          <Labeled label="Shop phone" name="shopPhone" problem={problem}><input value={draft.shopPhone} onChange={(e) => setDraft({ ...draft, shopPhone: e.target.value })} /></Labeled>
+          {draft.id ? <label className="check"><input type="checkbox" checked={!!draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /> Show in the app</label> : null}
           <h3 className="full">Owner</h3>
-          <label>Name<input value={draft.ownerName} onChange={(e) => setDraft({ ...draft, ownerName: e.target.value })} required /></label>
-          <label>Email<input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} required /></label>
-          <label>Phone<input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} required /></label>
-          <label>Password<input type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} placeholder={draft.id ? "Leave blank to keep" : ""} required={!draft.id} /></label>
-          <label>Role
+          <Labeled label="Name" name="ownerName" problem={problem}><input value={draft.ownerName} onChange={(e) => setDraft({ ...draft, ownerName: e.target.value })} required /></Labeled>
+          <Labeled label="Email" name="email" problem={problem}><input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} required /></Labeled>
+          <Labeled label="Phone" name="phone" problem={problem}><input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} required /></Labeled>
+          <Labeled label="Password" name="password" problem={problem} hint="At least 8 characters, with a letter and a number.">
+            <input type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} placeholder={draft.id ? "Leave blank to keep" : ""} required={!draft.id} />
+          </Labeled>
+          <Labeled label="Role" name="roleId" problem={problem}>
             <select value={draft.roleId} onChange={(e) => setDraft({ ...draft, roleId: e.target.value })} required>
               <option value="">Choose a role</option>
               {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
             </select>
-          </label>
-          <label>Your percentage
+          </Labeled>
+          <Labeled label="Your percentage" name="commissionPercent" problem={problem}>
             <input type="number" min="0" max="100" step="0.1" value={draft.commissionPercent} onChange={(e) => setDraft({ ...draft, commissionPercent: e.target.value })} required />
-          </label>
+          </Labeled>
           {!roles.length ? <p className="full error">Create a role under Roles and permissions before adding a shop user.</p> : null}
           <div className="full">
             <h3>What they can post</h3>
@@ -863,6 +918,7 @@ export function Shops() {
 export function ShopProfile() {
   const [shop, setShop] = useState(null);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
   const [saved, setSaved] = useState("");
   useEffect(() => {
     api("/api/admin/shop").then((data) => setShop(data.shop)).catch((err) => setError(err.message));
@@ -873,12 +929,17 @@ export function ShopProfile() {
     event.preventDefault();
     setSaved("");
     setError("");
+    if (!String(shop.name || "").trim()) {
+      setProblem({ field: "name", message: "Enter the shop name." });
+      return;
+    }
+    setProblem(null);
     try {
       const result = await api("/api/admin/shop", { method: "PUT", body: shop });
       setShop(result.shop);
       setSaved("Saved. The app shows this name on your pieces.");
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     }
   }
 
@@ -891,12 +952,12 @@ export function ShopProfile() {
           <p className="muted">The name buyers see on your stones and jewellery in the shared app.</p>
         </div>
       </div>
-      {error ? <p className="error">{error}</p> : null}
+      {problem?.message && !problem.field ? <p className="error">{problem.message}</p> : null}
       {saved ? <p>{saved}</p> : null}
       <form className="panel grid-form" onSubmit={save}>
-        <label>Shop name<input value={shop.name || ""} onChange={(e) => setShop({ ...shop, name: e.target.value })} required /></label>
-        <label>City<input value={shop.city || ""} onChange={(e) => setShop({ ...shop, city: e.target.value })} /></label>
-        <label>Phone<input value={shop.phone || ""} onChange={(e) => setShop({ ...shop, phone: e.target.value })} /></label>
+        <Labeled label="Shop name" name="name" problem={problem}><input value={shop.name || ""} onChange={(e) => setShop({ ...shop, name: e.target.value })} required /></Labeled>
+        <Labeled label="City" name="city" problem={problem}><input value={shop.city || ""} onChange={(e) => setShop({ ...shop, city: e.target.value })} /></Labeled>
+        <Labeled label="Phone" name="phone" problem={problem}><input value={shop.phone || ""} onChange={(e) => setShop({ ...shop, phone: e.target.value })} /></Labeled>
         <div className="full"><button className="primary">Save</button></div>
       </form>
     </section>
@@ -953,6 +1014,7 @@ export function Roles() {
   const [menus, setMenus] = useState([]);
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
   const [saving, setSaving] = useState(false);
 
   function load() {
@@ -973,8 +1035,13 @@ export function Roles() {
 
   async function save(event) {
     event.preventDefault();
+    if (!String(draft.name || "").trim()) {
+      setProblem({ field: "name", message: "Enter a role name." });
+      return;
+    }
     setSaving(true);
     setError("");
+    setProblem(null);
     try {
       const body = { name: draft.name, menus: draft.menus };
       if (draft.id) await api(`/api/admin/roles/${draft.id}`, { method: "PATCH", body });
@@ -982,7 +1049,7 @@ export function Roles() {
       setDraft(null);
       load();
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setSaving(false);
     }
@@ -1009,9 +1076,9 @@ export function Roles() {
             <p className="muted">Tick the menus this role can see. Every shop user with this role sees the same menus.</p>
           </div>
         </div>
-        {error ? <p className="error">{error}</p> : null}
+        {problem?.message && !problem.field ? <p className="error">{problem.message}</p> : null}
         <form className="panel grid-form" onSubmit={save}>
-          <label className="full">Role name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
+          <Labeled className="full" label="Role name" name="name" problem={problem}><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></Labeled>
           <div className="full checks">
             {menus.map((item) => (
               <label key={item.id}><input type="checkbox" checked={draft.menus.includes(item.id)} onChange={() => toggleMenu(item.id)} />{item.label}</label>

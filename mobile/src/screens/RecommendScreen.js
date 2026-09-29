@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { api, money } from "../api";
+import { api, formProblem, money } from "../api";
 import { useStore } from "../store";
 import { Button, Screen, Title, colors } from "../ui";
 
@@ -18,6 +18,7 @@ export default function RecommendScreen({ navigation }) {
   });
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
 
   useEffect(() => {
     api("/api/bootstrap", { currency }).then((data) => setPurposes(data.purposes || [])).catch((err) => setError(err.message));
@@ -29,6 +30,7 @@ export default function RecommendScreen({ navigation }) {
 
   async function submit() {
     setError("");
+    setProblem(null);
     try {
       const data = await api("/api/recommendations", {
         method: "POST",
@@ -37,18 +39,19 @@ export default function RecommendScreen({ navigation }) {
       });
       setResult(data);
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     }
   }
 
   return (
     <Screen>
       <Title kicker="Advice" sub="The stone comes from the rashi windows and purpose map saved in the portal.">Which stone to wear</Title>
-      <Field label="Birth date (YYYY-MM-DD)" value={form.birthDate} onChangeText={(value) => set("birthDate", value)} />
+      <Field name="birthDate" problem={problem} label="Birth date (YYYY-MM-DD)" value={form.birthDate} onChangeText={(value) => set("birthDate", value)} />
       <Field label="Birth time" value={form.birthTime} onChangeText={(value) => set("birthTime", value)} />
       <Field label="Place of birth" value={form.birthPlace} onChangeText={(value) => set("birthPlace", value)} />
       <Field label="Body weight, kg" value={form.weightKg} onChangeText={(value) => set("weightKg", value)} keyboardType="decimal-pad" />
       <Text style={styles.label}>Purpose</Text>
+      {problem?.field === "purpose" ? <Text style={styles.error}>{problem.message}</Text> : null}
       <View style={styles.row}>
         {purposes.map((purpose) => (
           <Pressable key={purpose.slug} onPress={() => set("purpose", purpose.slug)} style={[styles.chip, form.purpose === purpose.slug && styles.chipOn]}>
@@ -58,7 +61,7 @@ export default function RecommendScreen({ navigation }) {
       </View>
       <Field label="Your name" value={form.name} onChangeText={(value) => set("name", value)} />
       <Field label="Phone" value={form.phone} onChangeText={(value) => set("phone", value)} />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error || (problem?.message && !problem.field) ? <Text style={styles.error}>{error || problem.message}</Text> : null}
       <Button label="Show the guide" onPress={submit} />
       {result ? (
         <View style={styles.result}>
@@ -80,11 +83,13 @@ export default function RecommendScreen({ navigation }) {
   );
 }
 
-function Field({ label, ...props }) {
+function Field({ label, name, problem, ...props }) {
+  const message = problem?.field === name ? problem.message : "";
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={styles.label}>{label}</Text>
       <TextInput {...props} style={styles.input} placeholderTextColor={colors.muted} />
+      {message ? <Text style={styles.error}>{message}</Text> : null}
     </View>
   );
 }

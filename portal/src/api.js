@@ -25,6 +25,41 @@ export async function api(path, { method = "GET", body } = {}) {
     setToken(null);
     window.dispatchEvent(new Event("vg-logout"));
   }
-  if (!response.ok) throw new Error(data.error || "The desk could not complete that.");
+  if (!response.ok) {
+    const error = new Error(data.error || "The desk could not complete that.");
+    error.field = data.field || "";
+    throw error;
+  }
   return data;
+}
+
+export function formProblem(err) {
+  const message = err?.message || "";
+  return { message, field: err?.field || inferField(message) };
+}
+
+function inferField(message) {
+  const text = String(message || "");
+  const rules = [
+    [/email, phone, or password is incorrect/i, ""],
+    [/current password/i, "current"],
+    [/password/i, "password"],
+    [/percentage/i, "commissionPercent"],
+    [/choose a role/i, "roleId"],
+    [/owner's name/i, "ownerName"],
+    [/owner's email|with that email/i, "email"],
+    [/owner's phone|with that phone/i, "phone"],
+    [/shop name|^name is required|product name/i, "name"],
+    [/role name|that role name/i, "name"],
+    [/\bsku\b/i, "sku"],
+    [/\bslug\b/i, "slug"],
+    [/symbol/i, "symbol"],
+    [/\brate\b/i, "rate"],
+    [/^code\b|currency code/i, "code"],
+    [/currency name/i, "name"],
+  ];
+  for (const [pattern, field] of rules) {
+    if (pattern.test(text)) return field;
+  }
+  return "";
 }

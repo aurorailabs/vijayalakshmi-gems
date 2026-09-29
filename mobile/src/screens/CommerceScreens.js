@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { api } from "../api";
+import { api, formProblem } from "../api";
 import { useStore } from "../store";
 import { Button, Screen, Title, colors } from "../ui";
 
@@ -21,6 +21,7 @@ export function CheckoutScreen({ navigation }) {
   const [note, setNote] = useState("");
   const [quote, setQuote] = useState(null);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
   const [busy, setBusy] = useState(false);
   const [order, setOrder] = useState(null);
 
@@ -55,6 +56,7 @@ export function CheckoutScreen({ navigation }) {
 
   async function place() {
     setError("");
+    setProblem(null);
     setBusy(true);
     try {
       const body = {
@@ -69,7 +71,7 @@ export function CheckoutScreen({ navigation }) {
       const data = await api("/api/checkout", { method: "POST", currency, body });
       setOrder(data.order);
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setBusy(false);
     }
@@ -120,7 +122,7 @@ export function CheckoutScreen({ navigation }) {
             ["postal", "Postal code"],
             ["country", "Country"],
           ].map(([key, label]) => (
-            <Field key={key} label={label} value={form[key]} onChangeText={(value) => set(key, value)} />
+            <Field key={key} name={key} problem={problem} label={label} value={form[key]} onChangeText={(value) => set(key, value)} />
           ))}
           <Pressable onPress={() => setSaveAddress((value) => !value)} style={styles.check}>
             <Text>{saveAddress ? "Saved on the account" : "Save this address"}</Text>
@@ -137,9 +139,8 @@ export function CheckoutScreen({ navigation }) {
       ))}
 
       <Text style={styles.section}>Offer code</Text>
-      <Field label="Code" value={coupon} onChangeText={setCoupon} autoCapitalize="characters" />
+      <Field name="coupon" problem={quote?.couponError ? { field: "coupon", message: quote.couponError } : problem} label="Code" value={coupon} onChangeText={setCoupon} autoCapitalize="characters" />
       <Button ghost label="Apply code" onPress={() => setApplied(coupon.trim())} />
-      {quote?.couponError ? <Text style={styles.error}>{quote.couponError}</Text> : null}
       {quote?.couponCode ? <Text style={styles.good}>{quote.couponCode} is on this order.</Text> : null}
       <Text style={styles.muted}>Try WELCOME10 for 10% off, or GEM50 for $50 off orders of $200 or more.</Text>
 
@@ -150,7 +151,7 @@ export function CheckoutScreen({ navigation }) {
           <Text style={styles.muted}>{item.detail}</Text>
         </Pressable>
       ))}
-      <Field label="Note for the desk" value={note} onChangeText={setNote} />
+      <Field name="note" problem={problem} label="Note for the desk" value={note} onChangeText={setNote} />
 
       {quote ? (
         <View style={styles.totals}>
@@ -161,7 +162,7 @@ export function CheckoutScreen({ navigation }) {
           <Text style={styles.total}>To pay {quote.symbol}{quote.total}</Text>
         </View>
       ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error || (problem?.message && !["name", "phone", "line1", "line2", "city", "state", "postal", "country", "coupon", "note"].includes(problem.field)) ? <Text style={styles.error}>{error || problem.message}</Text> : null}
       <Button label={busy ? "Placing…" : "Place the order"} onPress={place} disabled={busy} />
     </Screen>
   );
@@ -228,6 +229,7 @@ export function AddressesScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(emptyAddress);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
 
   const load = useCallback(() => {
     if (!user) return;
@@ -237,12 +239,13 @@ export function AddressesScreen({ navigation }) {
 
   async function save() {
     setError("");
+    setProblem(null);
     try {
       await api("/api/addresses", { method: "POST", body: form });
       setForm({ ...emptyAddress, name: user?.name || "", phone: user?.phone || "" });
       load();
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     }
   }
 
@@ -263,9 +266,9 @@ export function AddressesScreen({ navigation }) {
       ))}
       <Text style={styles.section}>Add an address</Text>
       {[["name", "Name"], ["phone", "Phone"], ["line1", "Address"], ["city", "City"], ["state", "State"], ["postal", "Postal code"], ["country", "Country"]].map(([key, label]) => (
-        <Field key={key} label={label} value={form[key]} onChangeText={(value) => setForm({ ...form, [key]: value })} />
+        <Field key={key} name={key} problem={problem} label={label} value={form[key]} onChangeText={(value) => setForm({ ...form, [key]: value })} />
       ))}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error || (problem?.message && !problem.field) ? <Text style={styles.error}>{error || problem.message}</Text> : null}
       <Button label="Save address" onPress={save} />
     </Screen>
   );
@@ -277,28 +280,31 @@ export function ProfileScreen() {
   const [passwords, setPasswords] = useState({ current: "", password: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
 
   async function saveDetails() {
     setError("");
+    setProblem(null);
     setMessage("");
     try {
       const data = await api("/api/auth/profile", { method: "PATCH", body: form });
       updateUser(data.user);
       setMessage("Your details are saved.");
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     }
   }
 
   async function savePassword() {
     setError("");
+    setProblem(null);
     setMessage("");
     try {
       await api("/api/auth/password", { method: "POST", body: passwords });
       setPasswords({ current: "", password: "" });
       setMessage("The password is changed.");
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     }
   }
 
@@ -307,15 +313,15 @@ export function ProfileScreen() {
   return (
     <Screen safe={false}>
       <Title kicker="Account" sub={user.email}>{user.name}</Title>
-      <Field label="Name" value={form.name} onChangeText={(value) => setForm({ ...form, name: value })} />
-      <Field label="Phone" value={form.phone} onChangeText={(value) => setForm({ ...form, phone: value })} keyboardType="phone-pad" />
+      <Field name="name" problem={problem} label="Name" value={form.name} onChangeText={(value) => setForm({ ...form, name: value })} />
+      <Field name="phone" problem={problem} label="Phone" value={form.phone} onChangeText={(value) => setForm({ ...form, phone: value })} keyboardType="phone-pad" />
       <Button label="Save details" onPress={saveDetails} />
       <Text style={styles.section}>Password</Text>
-      <Field label="Current password" value={passwords.current} onChangeText={(value) => setPasswords({ ...passwords, current: value })} secureTextEntry />
-      <Field label="New password" value={passwords.password} onChangeText={(value) => setPasswords({ ...passwords, password: value })} secureTextEntry />
+      <Field name="current" problem={problem} label="Current password" value={passwords.current} onChangeText={(value) => setPasswords({ ...passwords, current: value })} secureTextEntry />
+      <Field name="password" problem={problem} label="New password" value={passwords.password} onChangeText={(value) => setPasswords({ ...passwords, password: value })} secureTextEntry />
       <Button ghost label="Change password" onPress={savePassword} />
       {message ? <Text style={styles.good}>{message}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error || (problem?.message && !problem.field) ? <Text style={styles.error}>{error || problem.message}</Text> : null}
     </Screen>
   );
 }
@@ -329,11 +335,13 @@ function Line({ label, value }) {
   );
 }
 
-function Field({ label, ...props }) {
+function Field({ label, name, problem, ...props }) {
+  const message = problem?.field === name ? problem.message : "";
   return (
     <View style={{ marginBottom: 8 }}>
       <Text style={styles.label}>{label}</Text>
       <TextInput {...props} accessibilityLabel={label} style={styles.input} placeholderTextColor={colors.muted} />
+      {message ? <Text style={styles.error}>{message}</Text> : null}
     </View>
   );
 }

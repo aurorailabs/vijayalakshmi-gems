@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, getToken, setToken } from "./api.js";
+import { api, formProblem, getToken, setToken } from "./api.js";
 import { Coupons, Customers, Currencies, Dashboard, Desk, Enquiries, Orders, Pieces, Recommendations, Resource, Roles, Settings, ShopProfile, Shops } from "./screens.jsx";
 
 const SHOP_NAV = [
@@ -51,6 +51,8 @@ export default function App() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState(null);
+  const fieldNote = (name) => (problem?.field === name ? problem.message : "");
 
   useEffect(() => {
     const onLogout = () => {
@@ -100,23 +102,24 @@ export default function App() {
     const digits = trimmed.replace(/\D/g, "");
     const phoneLength = digits.startsWith("91") && digits.length === 12 ? 10 : digits.replace(/^0/, "").length;
     if (trimmed.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setError("Enter a valid email.");
+      setProblem({ field: "identifier", message: "Enter a valid email." });
       return;
     }
     if (!trimmed.includes("@") && phoneLength < 10) {
-      setError("Enter your email or phone number.");
+      setProblem({ field: "identifier", message: "Enter your email or phone number." });
       return;
     }
     if (!password) {
-      setError("Enter your password.");
+      setProblem({ field: "password", message: "Enter your password." });
       return;
     }
     setError("");
+    setProblem(null);
     setBusy(true);
     try {
       const result = await api("/api/auth/login", { method: "POST", body: { identifier: trimmed, password } });
       if (!isDeskUser(result.user)) {
-        setError("This desk is for shop staff.");
+        setProblem({ field: "", message: "This desk is for shop staff." });
         return;
       }
       setToken(result.token);
@@ -125,7 +128,7 @@ export default function App() {
       setSection(result.user.role === "superadmin" ? "dashboard" : "desk");
       setPassword("");
     } catch (err) {
-      setError(err.message);
+      setProblem(formProblem(err));
     } finally {
       setBusy(false);
     }
@@ -147,9 +150,15 @@ export default function App() {
           <h1>Vijayalakshmi Gems</h1>
           <p className="muted">What you save here is what the mobile app shows.</p>
           <div className="form">
-            <label>Email or phone<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoComplete="username" required /></label>
-            <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
-            {error ? <p className="error">{error}</p> : null}
+            <label>Email or phone
+              <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoComplete="username" required />
+              {fieldNote("identifier") ? <span className="error">{fieldNote("identifier")}</span> : null}
+            </label>
+            <label>Password
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+              {fieldNote("password") ? <span className="error">{fieldNote("password")}</span> : null}
+            </label>
+            {(error || (problem?.message && !problem.field)) ? <p className="error">{error || problem.message}</p> : null}
             <button className="primary" type="submit" disabled={busy}>{busy ? "Opening…" : "Open the desk"}</button>
           </div>
           <p className="hint">Super admin: admin@vijayalakshmi.local or 8000001000 / Admin@123</p>
