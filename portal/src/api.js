@@ -20,7 +20,7 @@ export async function api(path, { method = "GET", body } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await response.json().catch(() => ({}));
-  if (response.status === 401) {
+  if (response.status === 401 && token) {
     setToken(null);
     window.dispatchEvent(new Event("vg-logout"));
   }

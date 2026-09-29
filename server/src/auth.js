@@ -3,20 +3,72 @@ import jwt from "jsonwebtoken";
 
 export const JWT_SECRET = process.env.JWT_SECRET || "dev-only-change-me";
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DUMMY_HASH = bcrypt.hashSync("not-a-login-password", 10);
+const attempts = new Map();
+
 export function hashPassword(password) {
   return bcrypt.hashSync(password, 10);
 }
 
 export function checkPassword(password, hash) {
-  return bcrypt.compareSync(password, hash);
+  return bcrypt.compareSync(String(password), hash || DUMMY_HASH);
+}
+
+export function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+export function phoneKey(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  return digits;
+}
+
+export function isEmail(value) {
+  return EMAIL.test(String(value || "").trim());
+}
+
+export function isPhone(value) {
+  const key = phoneKey(value);
+  return key.length >= 10 && key.length <= 15 && !String(value || "").includes("@");
+}
+
+export function registrationError({ name, email, password, phone }) {
+  if (!String(name || "").trim() || String(name).trim().length < 2) return "Enter your name.";
+  if (!isEmail(email)) return "Enter a valid email.";
+  if (!isPhone(phone)) return "Enter a valid phone number.";
+  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || password.length < 8) {
+    return "Use at least 8 characters, with letters and a number.";
+  }
+  return "";
 }
 
 export function signUser(user) {
   return jwt.sign(
-    { id: user.id, role: user.role, email: user.email, name: user.name },
+    { sub: String(user.id), id: user.id, role: user.role, email: user.email, name: user.name },
     JWT_SECRET,
     { expiresIn: "7d" },
   );
+}
+
+export function tooManyAttempts(key) {
+  const now = Date.now();
+  const recent = (attempts.get(key) || []).filter((at) => now - at < 15 * 60 * 1000);
+  attempts.set(key, recent);
+  return recent.length >= 8;
+}
+
+export function recordAttempt(key) {
+  const now = Date.now();
+  const recent = (attempts.get(key) || []).filter((at) => now - at < 15 * 60 * 1000);
+  recent.push(now);
+  attempts.set(key, recent);
+}
+
+export function clearAttempts(key) {
+  attempts.delete(key);
 }
 
 export function publicUser(user) {

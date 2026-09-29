@@ -4,8 +4,9 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import AccountScreen, { ArticleScreen, EnquireScreen, HelpScreen, OrdersScreen, PageScreen, WishlistScreen } from "./src/screens/AccountScreen";
-import { CheckoutScreen } from "./src/screens/BagScreen";
+import AuthScreen from "./src/screens/AuthScreen";
 import BagScreen from "./src/screens/BagScreen";
+import { AddressesScreen, CheckoutScreen, OrderScreen, ProfileScreen } from "./src/screens/CommerceScreens";
 import HomeScreen from "./src/screens/HomeScreen";
 import ProductScreen from "./src/screens/ProductScreen";
 import RecommendScreen from "./src/screens/RecommendScreen";
@@ -46,11 +47,15 @@ export default function App() {
           <StatusBar style="dark" />
           <Stack.Navigator screenOptions={{ headerTintColor: colors.ink, headerStyle: { backgroundColor: colors.ivory } }}>
             <Stack.Screen name="Main" component={Tabs} options={{ headerShown: false }} />
+            <Stack.Screen name="SignIn" component={AuthScreen} options={{ title: "Sign in" }} />
             <Stack.Screen name="Shop" component={ShopScreen} options={{ title: "Shop" }} />
             <Stack.Screen name="Product" component={ProductScreen} options={{ title: "" }} />
             <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: "Checkout" }} />
             <Stack.Screen name="Wishlist" component={WishlistScreen} options={{ title: "Saved" }} />
             <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: "Orders" }} />
+            <Stack.Screen name="Order" component={OrderScreen} options={{ title: "Order" }} />
+            <Stack.Screen name="Addresses" component={AddressesScreen} options={{ title: "Addresses" }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Your details" }} />
             <Stack.Screen name="Help" component={HelpScreen} options={{ title: "Help" }} />
             <Stack.Screen name="Page" component={PageScreen} options={{ title: "" }} />
             <Stack.Screen name="Article" component={ArticleScreen} options={{ title: "" }} />

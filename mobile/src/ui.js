@@ -1,4 +1,4 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { money } from "./api";
 
@@ -12,10 +12,34 @@ export const colors = {
   line: "#eadfce",
 };
 
+export function useShopWidth() {
+  const { width } = useWindowDimensions();
+  const page = Math.min(width, 1120);
+  const pad = page > 760 ? 28 : 16;
+  const inner = page - pad * 2;
+  const columns = inner > 900 ? 4 : inner > 640 ? 3 : 2;
+  const card = Math.floor((inner - (columns - 1) * 14) / columns);
+  return { wide: width > 760, columns, card, inner };
+}
+
 export function Screen({ children, safe = true }) {
   const insets = useSafeAreaInsets();
+  const { wide } = useShopWidth();
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: (safe ? insets.top : 0) + 16 }]}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      style={styles.screen}
+      contentContainerStyle={[
+        styles.content,
+        {
+          paddingTop: (safe ? insets.top : 0) + (wide ? 28 : 16),
+          paddingHorizontal: wide ? 28 : 16,
+          width: "100%",
+          maxWidth: 1120,
+          alignSelf: "center",
+        },
+      ]}
+    >
       {children}
     </ScrollView>
   );
@@ -31,24 +55,35 @@ export function Title({ kicker, children, sub }) {
   );
 }
 
-export function Button({ label, onPress, ghost }) {
+export function Button({ label, onPress, ghost, disabled }) {
   return (
-    <Pressable onPress={onPress} style={[styles.button, ghost && styles.ghost]}>
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      style={[styles.button, ghost && styles.ghost, disabled && styles.disabled]}
+    >
       <Text style={[styles.buttonText, ghost && styles.ghostText]}>{label}</Text>
     </Pressable>
   );
 }
 
-export function GemCard({ item, onPress }) {
+export function GemCard({ item, onPress, width = 168 }) {
+  const mark = item.vault ? "By appointment" : item.limited ? "Limited" : item.stock === 1 ? "One left" : item.carat ? `${item.carat} ct` : "";
   return (
-    <Pressable onPress={onPress} style={styles.card}>
-      <View style={[styles.gem, { backgroundColor: item.swatch || colors.maroon }]}>
-        {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.photo} /> : null}
-        <Text style={styles.gemMark}>{item.vault ? "Vault" : item.limited ? "Limited" : item.carat ? `${item.carat} ct` : item.kind}</Text>
+    <Pressable onPress={onPress} style={[styles.card, { width }]} accessibilityRole="button" accessibilityLabel={`View ${item.name}`}>
+      <View style={[styles.gem, { backgroundColor: item.swatch || colors.maroon, height: Math.round(width * 1.18) }]}>
+        {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.photo} resizeMode="cover" /> : null}
+        {mark ? <View style={styles.badge}><Text style={styles.gemMark}>{mark}</Text></View> : null}
       </View>
       <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-      <Text style={styles.cardMeta} numberOfLines={1}>{item.origin || item.metal || item.summary}</Text>
-      <Text style={styles.price}>{money(item)}{item.compareAt ? `  ${item.symbol}${Math.round(item.compareAt)}` : ""}</Text>
+      {item.shopName ? <Text style={styles.cardShop} numberOfLines={1}>{item.shopName}</Text> : null}
+      <Text style={styles.cardMeta} numberOfLines={1}>{[item.origin, item.certification].filter(Boolean).join(" · ") || item.metal}</Text>
+      <View style={styles.priceRow}>
+        <Text style={styles.price}>{money(item)}</Text>
+        {item.compareAt ? <Text style={styles.compare}>{item.symbol}{Math.round(item.compareAt).toLocaleString("en-IN")}</Text> : null}
+      </View>
     </Pressable>
   );
 }
@@ -69,19 +104,24 @@ export function openTarget(navigation, target) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ivory },
-  content: { padding: 18, paddingBottom: 40 },
+  content: { padding: 18, paddingBottom: 110 },
   kicker: { color: colors.gold, letterSpacing: 1.6, textTransform: "uppercase", fontSize: 12, marginBottom: 4 },
   title: { fontSize: 32, color: colors.ink, fontWeight: "600" },
   sub: { color: colors.muted, marginTop: 6, fontSize: 15 },
   button: { backgroundColor: colors.maroon, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 16, alignItems: "center" },
+  disabled: { opacity: 0.55 },
   ghost: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.line },
   buttonText: { color: "#fffaf3", fontWeight: "600" },
   ghostText: { color: colors.ink },
-  card: { width: 168, marginRight: 12 },
-  gem: { height: 150, borderRadius: 16, justifyContent: "flex-end", padding: 10, overflow: "hidden" },
+  card: { marginBottom: 6 },
+  gem: { borderRadius: 18, overflow: "hidden", justifyContent: "flex-end" },
   photo: { ...StyleSheet.absoluteFillObject },
-  gemMark: { color: "#fffaf3", fontSize: 12, fontWeight: "600" },
-  cardName: { marginTop: 8, color: colors.ink, fontSize: 15, fontWeight: "600" },
-  cardMeta: { color: colors.muted, fontSize: 12 },
-  price: { marginTop: 4, color: colors.maroon, fontWeight: "600" },
+  badge: { position: "absolute", left: 8, top: 8, backgroundColor: "rgba(24, 14, 10, 0.72)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  gemMark: { color: "#fffaf3", fontSize: 11, fontWeight: "700" },
+  cardName: { marginTop: 10, color: colors.ink, fontSize: 16, fontWeight: "600" },
+  cardShop: { color: colors.gold, fontSize: 12, fontWeight: "700", marginTop: 2 },
+  cardMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 4 },
+  price: { color: colors.maroon, fontWeight: "700", fontSize: 16 },
+  compare: { color: colors.muted, textDecorationLine: "line-through", fontSize: 13 },
 });

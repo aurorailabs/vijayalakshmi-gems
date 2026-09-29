@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useState } from "react";
-import { api } from "./api";
+import { api, setUnauthorizedHandler } from "./api";
+import { getToken, setToken } from "./session";
 
 const Store = createContext(null);
 
@@ -10,16 +11,18 @@ export function StoreProvider({ children }) {
   const [currency, setCurrencyState] = useState("USD");
 
   useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
     (async () => {
       const saved = await AsyncStorage.getItem("vg_currency");
       if (saved) setCurrencyState(saved);
-      const token = await AsyncStorage.getItem("vg_token");
+      const token = await getToken();
       if (token) {
         try {
           const data = await api("/api/auth/me");
           setUser(data.user);
         } catch {
-          await AsyncStorage.removeItem("vg_token");
+          await setToken(null);
+          setUser(null);
         }
       }
       setReady(true);
@@ -32,17 +35,21 @@ export function StoreProvider({ children }) {
   }
 
   async function signIn(token, nextUser) {
-    await AsyncStorage.setItem("vg_token", token);
+    await setToken(token);
     setUser(nextUser);
   }
 
   async function signOut() {
-    await AsyncStorage.removeItem("vg_token");
+    await setToken(null);
     setUser(null);
   }
 
+  function updateUser(nextUser) {
+    setUser(nextUser);
+  }
+
   return (
-    <Store.Provider value={{ ready, user, currency, setCurrency, signIn, signOut }}>
+    <Store.Provider value={{ ready, user, currency, setCurrency, signIn, signOut, updateUser }}>
       {children}
     </Store.Provider>
   );

@@ -1,12 +1,12 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../api";
 import { useStore } from "../store";
 import { Button, Screen, Title, colors } from "../ui";
 
 export default function BagScreen({ navigation }) {
-  const { user, currency } = useStore();
+  const { ready, user, currency } = useStore();
   const [cart, setCart] = useState(null);
   const [error, setError] = useState("");
 
@@ -22,11 +22,13 @@ export default function BagScreen({ navigation }) {
     setCart(next);
   }
 
+  if (!ready) return <Screen><Text>Opening your bag…</Text></Screen>;
+
   if (!user) {
     return (
       <Screen>
         <Title kicker="Bag" sub="The bag is kept on your account, so the price is always the portal price.">Sign in to see your bag</Title>
-        <Button label="Go to account" onPress={() => navigation.navigate("Account")} />
+        <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
       </Screen>
     );
   }
@@ -37,9 +39,12 @@ export default function BagScreen({ navigation }) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {(cart?.items || []).map((item) => (
         <View key={item.id} style={styles.row}>
+          <View style={[styles.thumb, { backgroundColor: item.swatch || colors.maroon }]}>
+            {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{item.name}</Text>
-            <Text>{item.symbol}{item.line}</Text>
+            <Text style={styles.linePrice}>{item.symbol}{item.line}</Text>
           </View>
           <Pressable onPress={() => setQty(item.id, item.qty - 1)} style={styles.qty}><Text>-</Text></Pressable>
           <Text>{item.qty}</Text>
@@ -49,7 +54,8 @@ export default function BagScreen({ navigation }) {
       {cart && !cart.items.length ? <Text style={styles.muted}>The bag is empty.</Text> : null}
       {cart?.items?.length ? (
         <View style={{ marginTop: 16, gap: 10 }}>
-          <Text style={styles.total}>Total {cart.symbol}{cart.subtotal}</Text>
+          <Text style={styles.total}>Pieces {cart.symbol}{cart.subtotal}</Text>
+          <Text style={styles.muted}>Delivery, GST, and an offer code are added at checkout.</Text>
           <Button label="Checkout" onPress={() => navigation.navigate("Checkout")} />
         </View>
       ) : null}
@@ -57,58 +63,10 @@ export default function BagScreen({ navigation }) {
   );
 }
 
-export function CheckoutScreen({ navigation }) {
-  const { user, currency } = useStore();
-  const [form, setForm] = useState({
-    name: user?.name || "",
-    phone: user?.phone || "",
-    line1: "",
-    city: "",
-    country: "India",
-    note: "",
-  });
-  const [error, setError] = useState("");
-  const [order, setOrder] = useState(null);
-
-  function set(key, value) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
-
-  async function place() {
-    setError("");
-    try {
-      const data = await api("/api/checkout", { method: "POST", currency, body: { shipping: form, note: form.note } });
-      setOrder(data.order);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  if (order) {
-    return (
-      <Screen>
-        <Title kicker="Placed">Order #{order.id}</Title>
-        <Text>We have {order.items.map((item) => item.name).join(", ")}.</Text>
-        <Text style={{ marginVertical: 8 }}>Total {order.symbol}{order.subtotal} · {order.status}</Text>
-        <Button label="Back to the house" onPress={() => navigation.navigate("Main")} />
-      </Screen>
-    );
-  }
-
-  return (
-    <Screen>
-      <Title kicker="Checkout">Where should it go?</Title>
-      {["name", "phone", "line1", "city", "country", "note"].map((key) => (
-        <TextInput key={key} value={form[key]} onChangeText={(value) => set(key, value)} placeholder={key} style={styles.input} placeholderTextColor={colors.muted} />
-      ))}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button label="Place the order" onPress={place} />
-    </Screen>
-  );
-}
-
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  thumb: { width: 72, height: 72, borderRadius: 12, overflow: "hidden" },
+  linePrice: { color: colors.maroon, fontWeight: "700", marginTop: 4 },
   name: { fontWeight: "600", color: colors.ink },
   qty: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center" },
   total: { fontSize: 20, fontWeight: "600", color: colors.ink },

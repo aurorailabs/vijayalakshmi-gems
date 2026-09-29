@@ -98,6 +98,27 @@ export function Resource({ title, intro, table, columns, fields }) {
     reload();
   }
 
+  if (draft) {
+    return (
+      <section>
+        <button className="ghost back" type="button" onClick={() => setDraft(null)}>Back to {title.toLowerCase()}</button>
+        <div className="top">
+          <div>
+            <p className="eyebrow">{title}</p>
+            <h1>{draft.id ? "Edit" : "Add"}</h1>
+          </div>
+        </div>
+        {error ? <p className="error">{error}</p> : null}
+        <form className="panel grid-form" onSubmit={save}>
+          {resolved.map((field) => <Field key={field.key} field={field} draft={draft} setDraft={setDraft} />)}
+          <div className="full row-actions">
+            <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+          </div>
+        </form>
+      </section>
+    );
+  }
+
   return (
     <section>
       <div className="top">
@@ -127,21 +148,11 @@ export function Resource({ title, intro, table, columns, fields }) {
           </tbody>
         </table>
       </div>
-      {draft ? (
-        <form className="panel grid-form" onSubmit={save}>
-          <h2 className="full">{draft.id ? "Edit" : "Add"}</h2>
-          {resolved.map((field) => <Field key={field.key} field={field} draft={draft} setDraft={setDraft} />)}
-          <div className="full row-actions">
-            <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save"}</button>
-            <button className="ghost" type="button" onClick={() => setDraft(null)}>Close</button>
-          </div>
-        </form>
-      ) : null}
     </section>
   );
 }
 
-export function Desk() {
+export function Desk({ role, shopName }) {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -154,15 +165,16 @@ export function Desk() {
       <div className="top">
         <div>
           <p className="eyebrow">Vijayalakshmi Gems</p>
-          <h1>Desk</h1>
-          <p className="muted">Catalog, prices, advice rules, and copy all come from this portal. The phone app does not keep its own list.</p>
+          <h1>Overview</h1>
+          <p className="muted">{role === "shop" ? `${shopName || "Your shop"} on the shared app. Buyers see your stones and jewellery next to every other shop.` : "Every shop on the shared app. You decide who can sign in, and which menus they can use."}</p>
         </div>
       </div>
       <div className="cards">
-        <article className="card"><span>Pieces on sale</span><b>{stats.products}</b></article>
+        {stats.shops != null ? <article className="card"><span>Shops</span><b>{stats.shops}</b></article> : null}
+        <article className="card"><span>Products on sale</span><b>{stats.products}</b></article>
         <article className="card"><span>Orders</span><b>{stats.orders}</b></article>
-        <article className="card"><span>New enquiries</span><b>{stats.enquiries}</b></article>
-        <article className="card"><span>Advice requests</span><b>{stats.recommendations}</b></article>
+        <article className="card"><span>New messages</span><b>{stats.enquiries}</b></article>
+        {stats.recommendations != null ? <article className="card"><span>Stone advice</span><b>{stats.recommendations}</b></article> : null}
       </div>
       <div className="panel">
         <h2>Short stock</h2>
@@ -185,7 +197,7 @@ const emptyPiece = {
   callForPrice: 0, featured: 0, bestseller: 0, limited: 0, vault: 0, active: 1,
 };
 
-export function Pieces() {
+export function Pieces({ features = { gemstones: true, jewellery: true } }) {
   const { items, error, reload, setError } = useItems("/api/admin/products");
   const [categories, setCategories] = useState([]);
   const [query, setQuery] = useState("");
@@ -253,50 +265,25 @@ export function Pieces() {
   const leaves = categories.filter((item) => item.parentId);
   const set = (key, value) => setDraft({ ...draft, [key]: value });
 
-  return (
-    <section>
-      <div className="top">
-        <div>
-          <p className="eyebrow">Catalog</p>
-          <h1>Pieces</h1>
-          <p className="muted">Prices are stored in US dollars. The app multiplies by the currency rate.</p>
+  if (draft) {
+    return (
+      <section>
+        <button className="ghost back" type="button" onClick={() => setDraft(null)}>Back to products</button>
+        <div className="top">
+          <div>
+            <p className="eyebrow">Catalog</p>
+            <h1>{draft.id ? draft.name || "Edit product" : "New product"}</h1>
+          </div>
         </div>
-        <div className="toolbar">
-          <input placeholder="Search pieces" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button className="primary" onClick={() => setDraft({ ...emptyPiece })}>Add piece</button>
-        </div>
-      </div>
-      {error ? <p className="error">{error}</p> : null}
-      <div className="panel table-wrap">
-        <table>
-          <thead><tr><th></th><th>Piece</th><th>SKU</th><th>Price USD</th><th>Stock</th><th></th></tr></thead>
-          <tbody>
-            {visible.map((item) => (
-              <tr key={item.id}>
-                <td><span className="swatch" style={{ background: item.swatch }} /></td>
-                <td>{item.name}{item.active ? "" : " (hidden)"}</td>
-                <td>{item.sku}</td>
-                <td>{item.callForPrice ? "Ask" : item.priceCents / 100}</td>
-                <td>{item.stock}</td>
-                <td className="row-actions">
-                  <button className="ghost" onClick={() => edit(item)}>Edit</button>
-                  <button className="danger" onClick={() => hide(item.id)}>Hide</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {draft ? (
+        {error ? <p className="error">{error}</p> : null}
         <form className="panel grid-form" onSubmit={save}>
-          <h2 className="full">{draft.id ? draft.name : "New piece"}</h2>
           <label>Name<input value={draft.name} onChange={(e) => set("name", e.target.value)} required /></label>
           <label>SKU<input value={draft.sku} onChange={(e) => set("sku", e.target.value)} /></label>
           <label>Slug<input value={draft.slug} onChange={(e) => set("slug", e.target.value)} /></label>
           <label>Kind
             <select value={draft.kind} onChange={(e) => set("kind", e.target.value)}>
-              <option value="loose">Loose stone</option>
-              <option value="jewellery">Jewellery</option>
+              {features.gemstones ? <option value="loose">Loose stone</option> : null}
+              {features.jewellery ? <option value="jewellery">Jewellery</option> : null}
             </select>
           </label>
           <label>Category
@@ -334,42 +321,41 @@ export function Pieces() {
             ))}
           </div>
           <div className="full row-actions">
-            <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save piece"}</button>
-            <button className="ghost" type="button" onClick={() => setDraft(null)}>Close</button>
+            <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save product"}</button>
           </div>
         </form>
-      ) : null}
-    </section>
-  );
-}
-
-export function Orders() {
-  const { items, error, reload, setError } = useItems("/api/admin/orders");
-  async function setStatus(id, status) {
-    try {
-      await api(`/api/admin/orders/${id}`, { method: "PATCH", body: { status } });
-      reload();
-    } catch (err) {
-      setError(err.message);
-    }
+      </section>
+    );
   }
+
   return (
     <section>
-      <div className="top"><div><p className="eyebrow">Commerce</p><h1>Orders</h1></div></div>
+      <div className="top">
+        <div>
+          <p className="eyebrow">Catalog</p>
+          <h1>Products</h1>
+          <p className="muted">Stones and jewellery for sale. The price is in US dollars. The app converts it for the shopper.</p>
+        </div>
+        <div className="toolbar">
+          <input placeholder="Search products" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button className="primary" onClick={() => setDraft({ ...emptyPiece, kind: features.jewellery && !features.gemstones ? "jewellery" : "loose" })}>Add product</button>
+        </div>
+      </div>
       {error ? <p className="error">{error}</p> : null}
       <div className="panel table-wrap">
         <table>
-          <thead><tr><th>Order</th><th>Ship to</th><th>Total</th><th>Status</th></tr></thead>
+          <thead><tr><th></th><th>Product</th><th>SKU</th><th>Price USD</th><th>Stock</th><th></th></tr></thead>
           <tbody>
-            {items.map((order) => (
-              <tr key={order.id}>
-                <td>#{order.id}<br />{order.items.map((item) => `${item.qty} × ${item.name}`).join(", ")}</td>
-                <td>{order.shipName}<br />{order.shipLine1}, {order.shipCity}</td>
-                <td>{order.symbol}{order.subtotal}</td>
-                <td>
-                  <select value={order.status} onChange={(e) => setStatus(order.id, e.target.value)}>
-                    {["placed", "confirmed", "shipped", "delivered", "cancelled"].map((status) => <option key={status}>{status}</option>)}
-                  </select>
+            {visible.map((item) => (
+              <tr key={item.id}>
+                <td><span className="swatch" style={{ background: item.swatch }} /></td>
+                <td>{item.name}{item.active ? "" : " (hidden)"}</td>
+                <td>{item.sku}</td>
+                <td>{item.callForPrice ? "Ask" : item.priceCents / 100}</td>
+                <td>{item.stock}</td>
+                <td className="row-actions">
+                  <button className="ghost" onClick={() => edit(item)}>Edit</button>
+                  <button className="danger" onClick={() => hide(item.id)}>Hide</button>
                 </td>
               </tr>
             ))}
@@ -380,8 +366,100 @@ export function Orders() {
   );
 }
 
+export function Orders() {
+  const { items, error, reload, setError } = useItems("/api/admin/orders");
+  const [openId, setOpenId] = useState(null);
+  const order = items.find((item) => item.id === openId);
+  async function setStatus(id, status) {
+    try {
+      await api(`/api/admin/orders/${id}`, { method: "PATCH", body: { status } });
+      reload();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+  async function setPayment(id, paymentStatus) {
+    try {
+      await api(`/api/admin/orders/${id}`, { method: "PATCH", body: { paymentStatus } });
+      reload();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+  if (order) {
+    return (
+      <section>
+        <button className="ghost back" type="button" onClick={() => setOpenId(null)}>Back to orders</button>
+        <div className="top"><div><p className="eyebrow">Commerce</p><h1>Order #{order.id}</h1></div></div>
+        {error ? <p className="error">{error}</p> : null}
+        <div className="panel">
+          <p>{order.items.map((item) => `${item.qty} × ${item.name}`).join(", ")}</p>
+          <p>{order.shipName}<br />{[order.shipLine1, order.shipCity, order.shipPostal, order.shipCountry].filter(Boolean).join(", ")}</p>
+          <p>Total {order.symbol}{order.total}{order.couponCode ? ` · ${order.couponCode}` : ""}</p>
+          <div className="grid-form">
+            <label>Status
+              <select value={order.status} onChange={(e) => setStatus(order.id, e.target.value)}>
+                {["placed", "confirmed", "shipped", "delivered", "cancelled"].map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </label>
+            <label>Payment
+              <select value={order.paymentStatus || "unpaid"} onChange={(e) => setPayment(order.id, e.target.value)}>
+                {["unpaid", "due", "paid"].map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </label>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <div className="top"><div><p className="eyebrow">Today</p><h1>Orders</h1><p className="muted">Open an order to update shipping and whether it is paid.</p></div></div>
+      {error ? <p className="error">{error}</p> : null}
+      <div className="panel table-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Ship to</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>#{item.id}<br />{item.items.map((line) => `${line.qty} × ${line.name}`).join(", ")}</td>
+                <td>{item.shipName}<br />{item.shipLine1}, {item.shipCity}</td>
+                <td>{item.symbol}{item.total}{item.couponCode ? <><br />{item.couponCode}</> : null}</td>
+                <td>{item.status}<br />{item.paymentStatus}</td>
+                <td><button className="ghost" onClick={() => setOpenId(item.id)}>Open</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function Coupons() {
+  return (
+    <Resource
+      title="Discounts"
+      intro="A code the shopper types at checkout. Percent is a number from 1 to 100. A fixed amount is US cents, so 5000 is $50."
+      table="coupons"
+      columns={[["code", "Code"], ["kind", "Kind"], ["amount", "Amount"], ["minCents", "Minimum cents"], ["active", "Active"]]}
+      fields={[
+        { key: "code", label: "Code" },
+        { key: "kind", label: "Kind", type: "select", options: ["percent", "amount"] },
+        { key: "amount", label: "Amount", type: "number" },
+        { key: "minCents", label: "Minimum, US cents", type: "number" },
+        { key: "expiresAt", label: "Expires (YYYY-MM-DD)" },
+        { key: "active", label: "Active", type: "check" },
+      ]}
+    />
+  );
+}
+
 export function Enquiries() {
   const { items, error, reload, setError } = useItems("/api/admin/enquiries");
+  const [openId, setOpenId] = useState(null);
+  const enquiry = items.find((item) => item.id === openId);
   async function setStatus(id, status) {
     try {
       await api(`/api/admin/enquiries/${id}`, { method: "PATCH", body: { status } });
@@ -390,24 +468,39 @@ export function Enquiries() {
       setError(err.message);
     }
   }
+  if (enquiry) {
+    return (
+      <section>
+        <button className="ghost back" type="button" onClick={() => setOpenId(null)}>Back to messages</button>
+        <div className="top"><div><p className="eyebrow">Today</p><h1>{enquiry.name || "Message"}</h1></div></div>
+        {error ? <p className="error">{error}</p> : null}
+        <div className="panel">
+          <p>{enquiry.phone}<br />{enquiry.email}</p>
+          <p>{enquiry.type}{enquiry.productName ? ` · ${enquiry.productName}` : ""}</p>
+          <p>{enquiry.message}</p>
+          <label>Status
+            <select value={enquiry.status} onChange={(e) => setStatus(enquiry.id, e.target.value)}>
+              {["new", "contacted", "closed"].map((status) => <option key={status}>{status}</option>)}
+            </select>
+          </label>
+        </div>
+      </section>
+    );
+  }
   return (
     <section>
-      <div className="top"><div><p className="eyebrow">Desk</p><h1>Enquiries</h1></div></div>
+      <div className="top"><div><p className="eyebrow">Today</p><h1>Messages</h1><p className="muted">People who wrote from the app. Mark each one contacted or closed.</p></div></div>
       {error ? <p className="error">{error}</p> : null}
       <div className="panel table-wrap">
         <table>
-          <thead><tr><th>From</th><th>About</th><th>Message</th><th>Status</th></tr></thead>
+          <thead><tr><th>From</th><th>About</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
-                <td>{item.name}<br />{item.phone}<br />{item.email}</td>
+                <td>{item.name}<br />{item.phone}</td>
                 <td>{item.type}{item.productName ? ` · ${item.productName}` : ""}</td>
-                <td>{item.message}</td>
-                <td>
-                  <select value={item.status} onChange={(e) => setStatus(item.id, e.target.value)}>
-                    {["new", "contacted", "closed"].map((status) => <option key={status}>{status}</option>)}
-                  </select>
-                </td>
+                <td>{item.status}</td>
+                <td><button className="ghost" onClick={() => setOpenId(item.id)}>Open</button></td>
               </tr>
             ))}
           </tbody>
@@ -421,7 +514,7 @@ export function Recommendations() {
   const { items, error } = useItems("/api/admin/recommendations");
   return (
     <section>
-      <div className="top"><div><p className="eyebrow">Advice</p><h1>Requests</h1><p className="muted">Every advice form on the phone is stored here, including the stone the rules returned.</p></div></div>
+      <div className="top"><div><p className="eyebrow">Shared app</p><h1>Advice rules</h1><p className="muted">Birth details someone sent, and the stone the shared app suggested.</p></div></div>
       {error ? <p className="error">{error}</p> : null}
       <div className="panel table-wrap">
         <table>
@@ -445,7 +538,7 @@ export function Customers() {
   const { items, error } = useItems("/api/admin/customers");
   return (
     <section>
-      <div className="top"><div><p className="eyebrow">Accounts</p><h1>Customers</h1></div></div>
+      <div className="top"><div><p className="eyebrow">Shop</p><h1>Customers</h1><p className="muted">People with an account: name, email, and phone.</p></div></div>
       {error ? <p className="error">{error}</p> : null}
       <div className="panel table-wrap">
         <table>
@@ -459,74 +552,88 @@ export function Customers() {
 
 export function Currencies() {
   const { items, error, reload, setError } = useItems("/api/admin/currencies");
-  const [draft, setDraft] = useState({ code: "", name: "", symbol: "", rate: "" });
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  async function save(item) {
+  async function save(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
     try {
-      await api(`/api/admin/currencies/${item.code}`, {
-        method: "PATCH",
-        body: { name: item.name, symbol: item.symbol, rate: Number(item.rate), isDefault: item.isDefault ? 1 : 0, active: item.active ? 1 : 0 },
-      });
+      if (draft.existing) {
+        await api(`/api/admin/currencies/${draft.code}`, {
+          method: "PATCH",
+          body: { name: draft.name, symbol: draft.symbol, rate: Number(draft.rate), isDefault: draft.isDefault ? 1 : 0, active: draft.active ? 1 : 0 },
+        });
+      } else {
+        await api("/api/admin/currencies", { method: "POST", body: { ...draft, rate: Number(draft.rate) } });
+      }
+      setDraft(null);
       reload();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function add(event) {
-    event.preventDefault();
-    try {
-      await api("/api/admin/currencies", { method: "POST", body: { ...draft, rate: Number(draft.rate) } });
-      setDraft({ code: "", name: "", symbol: "", rate: "" });
-      reload();
-    } catch (err) {
-      setError(err.message);
-    }
+  if (draft) {
+    return (
+      <section>
+        <button className="ghost back" type="button" onClick={() => setDraft(null)}>Back to currencies</button>
+        <div className="top"><div><p className="eyebrow">Money</p><h1>{draft.existing ? draft.code : "New currency"}</h1></div></div>
+        {error ? <p className="error">{error}</p> : null}
+        <form className="panel grid-form" onSubmit={save}>
+          <label>Code<input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} required disabled={draft.existing} /></label>
+          <label>Name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
+          <label>Symbol<input value={draft.symbol} onChange={(e) => setDraft({ ...draft, symbol: e.target.value })} required /></label>
+          <label>Rate<input type="number" step="0.0001" value={draft.rate} onChange={(e) => setDraft({ ...draft, rate: e.target.value })} required /></label>
+          {draft.existing ? <label><input type="checkbox" checked={!!draft.isDefault} onChange={(e) => setDraft({ ...draft, isDefault: e.target.checked ? 1 : 0 })} /> Default</label> : null}
+          <div className="full"><button className="primary" disabled={saving}>{saving ? "Saving…" : "Save"}</button></div>
+        </form>
+      </section>
+    );
   }
 
   return (
     <section>
-      <div className="top"><div><p className="eyebrow">Money</p><h1>Currencies</h1><p className="muted">Rate is how many units of this currency equal one US dollar.</p></div></div>
+      <div className="top">
+        <div>
+          <p className="eyebrow">Shared app</p>
+          <h1>Price rates</h1>
+          <p className="muted">How many of this currency equal one US dollar. The shop multiplies the dollar price by this rate.</p>
+        </div>
+        <button className="primary" onClick={() => setDraft({ code: "", name: "", symbol: "", rate: "", existing: false })}>Add</button>
+      </div>
       {error ? <p className="error">{error}</p> : null}
-      <div className="panel">
-        {items.map((item) => (
-          <CurrencyRow key={item.code} item={item} onSave={save} />
-        ))}
-        <form className="grid-form" onSubmit={add} style={{ marginTop: 16 }}>
-          <input placeholder="Code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} required />
-          <input placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
-          <input placeholder="Symbol" value={draft.symbol} onChange={(e) => setDraft({ ...draft, symbol: e.target.value })} required />
-          <input placeholder="Rate" type="number" step="0.0001" value={draft.rate} onChange={(e) => setDraft({ ...draft, rate: e.target.value })} required />
-          <button className="primary">Add currency</button>
-        </form>
+      <div className="panel table-wrap">
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Symbol</th><th>Rate</th><th></th></tr></thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.code}>
+                <td>{item.code}{item.isDefault ? " · default" : ""}</td>
+                <td>{item.name}</td>
+                <td>{item.symbol}</td>
+                <td>{item.rate}</td>
+                <td><button className="ghost" onClick={() => setDraft({ ...item, existing: true })}>Edit</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   );
 }
 
-function CurrencyRow({ item, onSave }) {
-  const [row, setRow] = useState(item);
-  useEffect(() => setRow(item), [item]);
-  return (
-    <div className="repeat-row" style={{ marginBottom: 8, gridTemplateColumns: "80px 1fr 80px 120px auto auto" }}>
-      <strong>{row.code}</strong>
-      <input value={row.name} onChange={(e) => setRow({ ...row, name: e.target.value })} />
-      <input value={row.symbol} onChange={(e) => setRow({ ...row, symbol: e.target.value })} />
-      <input type="number" step="0.0001" value={row.rate} onChange={(e) => setRow({ ...row, rate: e.target.value })} />
-      <label><input type="checkbox" checked={!!row.isDefault} onChange={(e) => setRow({ ...row, isDefault: e.target.checked ? 1 : 0 })} /> Default</label>
-      <button className="ghost" type="button" onClick={() => onSave(row)}>Save</button>
-    </div>
-  );
-}
-
-export function Settings() {
+export function Settings({ title = "App details", intro = "The shared app name, phones, and the note under stone advice." }) {
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   useEffect(() => {
     api("/api/admin/settings").then((data) => setSettings(data.settings)).catch((err) => setError(err.message));
   }, []);
-  if (!settings) return error ? <p className="error">{error}</p> : <p>Loading atelier…</p>;
+  if (!settings) return error ? <p className="error">{error}</p> : <p>Loading shop details…</p>;
 
   function setPhone(index, key, value) {
     const phones = settings.phones.map((phone, i) => (i === index ? { ...phone, [key]: value } : phone));
@@ -554,7 +661,7 @@ export function Settings() {
 
   return (
     <section>
-      <div className="top"><div><p className="eyebrow">Atelier</p><h1>Settings</h1></div></div>
+      <div className="top"><div><p className="eyebrow">Platform</p><h1>{title}</h1><p className="muted">{intro}</p></div></div>
       {error ? <p className="error">{error}</p> : null}
       {saved ? <p>{saved}</p> : null}
       <form className="panel grid-form" onSubmit={save}>
@@ -564,7 +671,7 @@ export function Settings() {
         <label>Sales hours<input value={settings.sales_hours || ""} onChange={(e) => setSettings({ ...settings, sales_hours: e.target.value })} /></label>
         <label>Support hours<input value={settings.support_hours || ""} onChange={(e) => setSettings({ ...settings, support_hours: e.target.value })} /></label>
         <label>Carat divisor<input type="number" value={settings.carat_divisor} onChange={(e) => setSettings({ ...settings, carat_divisor: e.target.value })} /></label>
-        <label className="full">Advice note<textarea value={settings.recommendation_disclaimer || ""} onChange={(e) => setSettings({ ...settings, recommendation_disclaimer: e.target.value })} /></label>
+        <label className="full">Note under stone advice<textarea value={settings.recommendation_disclaimer || ""} onChange={(e) => setSettings({ ...settings, recommendation_disclaimer: e.target.value })} /></label>
         <div className="full">
           <h3>Phones</h3>
           <div className="repeat">
@@ -591,8 +698,360 @@ export function Settings() {
             <button className="ghost" type="button" onClick={() => setSettings({ ...settings, locations: [...(settings.locations || []), { city: "", lines: "" }] })}>Add location</button>
           </div>
         </div>
-        <button className="primary">Save atelier</button>
+        <button className="primary">Save</button>
       </form>
+    </section>
+  );
+}
+
+const emptyShop = {
+  name: "",
+  city: "",
+  shopPhone: "",
+  ownerName: "",
+  email: "",
+  phone: "",
+  password: "",
+  roleId: "",
+  commissionPercent: "10",
+  features: { gemstones: true, jewellery: true },
+  active: true,
+};
+
+export function Shops() {
+  const [items, setItems] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [featureList, setFeatureList] = useState([]);
+  const [draft, setDraft] = useState(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function load() {
+    api("/api/admin/shops")
+      .then((data) => {
+        setItems(data.items || []);
+        setRoles(data.roles || []);
+        setFeatureList(data.features || []);
+      })
+      .catch((err) => setError(err.message));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function save(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const body = {
+        name: draft.name,
+        city: draft.city,
+        shopPhone: draft.shopPhone,
+        ownerName: draft.ownerName,
+        email: draft.email,
+        phone: draft.phone,
+        password: draft.password,
+        roleId: draft.roleId,
+        commissionPercent: Number(draft.commissionPercent),
+        features: draft.features,
+        active: draft.active,
+      };
+      if (draft.id) await api(`/api/admin/shops/${draft.id}`, { method: "PATCH", body });
+      else await api("/api/admin/shops", { method: "POST", body });
+      setDraft(null);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (draft) {
+    return (
+      <section>
+        <button className="ghost back" type="button" onClick={() => setDraft(null)}>Back to shop users</button>
+        <div className="top">
+          <div>
+            <p className="eyebrow">Shops</p>
+            <h1>{draft.id ? draft.name || "Edit shop user" : "New shop user"}</h1>
+            <p className="muted">Choose the role for their menus, and the percentage of their sales that is paid to you.</p>
+          </div>
+        </div>
+        {error ? <p className="error">{error}</p> : null}
+        <form className="panel grid-form" onSubmit={save}>
+          <label>Shop name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
+          <label>City<input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} /></label>
+          <label>Shop phone<input value={draft.shopPhone} onChange={(e) => setDraft({ ...draft, shopPhone: e.target.value })} /></label>
+          {draft.id ? <label><input type="checkbox" checked={!!draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /> Show in the app</label> : null}
+          <h3 className="full">Owner</h3>
+          <label>Name<input value={draft.ownerName} onChange={(e) => setDraft({ ...draft, ownerName: e.target.value })} required /></label>
+          <label>Email<input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} required /></label>
+          <label>Phone<input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} required /></label>
+          <label>Password<input type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} placeholder={draft.id ? "Leave blank to keep" : ""} required={!draft.id} /></label>
+          <label>Role
+            <select value={draft.roleId} onChange={(e) => setDraft({ ...draft, roleId: e.target.value })} required>
+              <option value="">Choose a role</option>
+              {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+            </select>
+          </label>
+          <label>Your percentage
+            <input type="number" min="0" max="100" step="0.1" value={draft.commissionPercent} onChange={(e) => setDraft({ ...draft, commissionPercent: e.target.value })} required />
+          </label>
+          {!roles.length ? <p className="full error">Create a role under Roles and permissions before adding a shop user.</p> : null}
+          <div className="full">
+            <h3>What they can post</h3>
+            <div className="checks">
+              {featureList.map((item) => (
+                <label key={item.id}>
+                  <input type="checkbox" checked={!!draft.features[item.id]} onChange={(e) => setDraft({ ...draft, features: { ...draft.features, [item.id]: e.target.checked } })} />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="full"><button className="primary" disabled={saving}>{saving ? "Saving…" : "Save shop user"}</button></div>
+        </form>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <div className="top">
+        <div>
+          <p className="eyebrow">Shops</p>
+          <h1>Shop users</h1>
+          <p className="muted">Create the login for a shop. The role decides which menus they see. The percentage is your share of their sales.</p>
+        </div>
+        <button className="primary" onClick={() => setDraft({ ...emptyShop, features: { ...emptyShop.features } })}>Add shop user</button>
+      </div>
+      {error ? <p className="error">{error}</p> : null}
+      <div className="panel table-wrap">
+        <table>
+          <thead><tr><th>Shop</th><th>Owner</th><th>Role</th><th>Your %</th><th></th></tr></thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>{item.name}{item.active ? "" : " (hidden)"}<br />{item.city}</td>
+                <td>{item.owner ? <>{item.owner.name}<br />{item.owner.email}</> : "No owner yet"}</td>
+                <td>{item.roleName || "No role"}</td>
+                <td>{item.commissionPercent}%</td>
+                <td><button className="ghost" onClick={() => setDraft({
+                  id: item.id,
+                  name: item.name,
+                  city: item.city,
+                  shopPhone: item.phone,
+                  ownerName: item.owner?.name || "",
+                  email: item.owner?.email || "",
+                  phone: item.owner?.phone || "",
+                  password: "",
+                  roleId: item.roleId || "",
+                  commissionPercent: item.commissionPercent,
+                  features: item.features,
+                  active: item.active,
+                })}>Edit</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function ShopProfile() {
+  const [shop, setShop] = useState(null);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  useEffect(() => {
+    api("/api/admin/shop").then((data) => setShop(data.shop)).catch((err) => setError(err.message));
+  }, []);
+  if (!shop) return error ? <p className="error">{error}</p> : <p>Loading shop details…</p>;
+
+  async function save(event) {
+    event.preventDefault();
+    setSaved("");
+    setError("");
+    try {
+      const result = await api("/api/admin/shop", { method: "PUT", body: shop });
+      setShop(result.shop);
+      setSaved("Saved. The app shows this name on your pieces.");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <section>
+      <div className="top">
+        <div>
+          <p className="eyebrow">Shop</p>
+          <h1>Shop details</h1>
+          <p className="muted">The name buyers see on your stones and jewellery in the shared app.</p>
+        </div>
+      </div>
+      {error ? <p className="error">{error}</p> : null}
+      {saved ? <p>{saved}</p> : null}
+      <form className="panel grid-form" onSubmit={save}>
+        <label>Shop name<input value={shop.name || ""} onChange={(e) => setShop({ ...shop, name: e.target.value })} required /></label>
+        <label>City<input value={shop.city || ""} onChange={(e) => setShop({ ...shop, city: e.target.value })} /></label>
+        <label>Phone<input value={shop.phone || ""} onChange={(e) => setShop({ ...shop, phone: e.target.value })} /></label>
+        <div className="full"><button className="primary">Save</button></div>
+      </form>
+    </section>
+  );
+}
+
+export function Dashboard() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api("/api/admin/dashboard").then(setData).catch((err) => setError(err.message));
+  }, []);
+  if (error) return <p className="error">{error}</p>;
+  if (!data) return <p>Opening the dashboard…</p>;
+  const money = (value) => `${data.symbol}${Number(value || 0).toLocaleString("en-IN")}`;
+  return (
+    <section>
+      <div className="top">
+        <div>
+          <p className="eyebrow">Super admin</p>
+          <h1>Dashboard</h1>
+          <p className="muted">Each shop’s sales, and the percentage of those sales that is paid to you.</p>
+        </div>
+      </div>
+      <div className="cards">
+        <article className="card"><span>Shops</span><b>{data.shops.length}</b></article>
+        <article className="card"><span>Shop sales</span><b>{money(data.earned)}</b></article>
+        <article className="card"><span>Your share</span><b>{money(data.share)}</b></article>
+      </div>
+      <div className="panel table-wrap">
+        <table>
+          <thead><tr><th>Shop</th><th>Owner</th><th>Earned</th><th>Your %</th><th>Paid to you</th></tr></thead>
+          <tbody>
+            {data.shops.map((shop) => (
+              <tr key={shop.shopId}>
+                <td>{shop.shopName}</td>
+                <td>{shop.ownerName || "No owner"}{shop.ownerEmail ? <><br />{shop.ownerEmail}</> : null}</td>
+                <td>{money(shop.earned)}</td>
+                <td>{shop.commissionPercent}%</td>
+                <td>{money(shop.share)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+const emptyRole = { name: "", menus: [] };
+
+export function Roles() {
+  const [items, setItems] = useState([]);
+  const [menus, setMenus] = useState([]);
+  const [draft, setDraft] = useState(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function load() {
+    api("/api/admin/roles")
+      .then((data) => {
+        setItems(data.items || []);
+        setMenus(data.menus || []);
+      })
+      .catch((err) => setError(err.message));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function toggleMenu(id) {
+    const next = draft.menus.includes(id) ? draft.menus.filter((item) => item !== id) : [...draft.menus, id];
+    setDraft({ ...draft, menus: next });
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const body = { name: draft.name, menus: draft.menus };
+      if (draft.id) await api(`/api/admin/roles/${draft.id}`, { method: "PATCH", body });
+      else await api("/api/admin/roles", { method: "POST", body });
+      setDraft(null);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(id) {
+    setError("");
+    try {
+      await api(`/api/admin/roles/${id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  if (draft) {
+    return (
+      <section>
+        <button className="ghost back" type="button" onClick={() => setDraft(null)}>Back to roles</button>
+        <div className="top">
+          <div>
+            <p className="eyebrow">Permissions</p>
+            <h1>{draft.id ? draft.name || "Edit role" : "New role"}</h1>
+            <p className="muted">Tick the menus this role can see. Every shop user with this role sees the same menus.</p>
+          </div>
+        </div>
+        {error ? <p className="error">{error}</p> : null}
+        <form className="panel grid-form" onSubmit={save}>
+          <label className="full">Role name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required /></label>
+          <div className="full checks">
+            {menus.map((item) => (
+              <label key={item.id}><input type="checkbox" checked={draft.menus.includes(item.id)} onChange={() => toggleMenu(item.id)} />{item.label}</label>
+            ))}
+          </div>
+          <div className="full"><button className="primary" disabled={saving}>{saving ? "Saving…" : "Save role"}</button></div>
+        </form>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <div className="top">
+        <div>
+          <p className="eyebrow">Permissions</p>
+          <h1>Roles and permissions</h1>
+          <p className="muted">A role is the set of menus a shop user is allowed to open.</p>
+        </div>
+        <button className="primary" onClick={() => setDraft({ ...emptyRole, menus: [] })}>Add role</button>
+      </div>
+      {error ? <p className="error">{error}</p> : null}
+      <div className="panel table-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Menus</th><th>Shop users</th><th></th></tr></thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>{item.name}</td>
+                <td>{item.menus.length}</td>
+                <td>{item.users}</td>
+                <td className="row-actions">
+                  <button className="ghost" onClick={() => setDraft({ id: item.id, name: item.name, menus: item.menus })}>Edit</button>
+                  <button className="danger" onClick={() => remove(item.id)}>Remove</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

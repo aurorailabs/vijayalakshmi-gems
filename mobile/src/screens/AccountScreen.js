@@ -5,40 +5,19 @@ import { useStore } from "../store";
 import { Button, Screen, Title, colors } from "../ui";
 
 export default function AccountScreen({ navigation }) {
-  const { user, signIn, signOut } = useStore();
-  const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ name: "", email: "meera@vijayalakshmi.local", password: "Demo@123", phone: "" });
-  const [error, setError] = useState("");
+  const { ready, user, signOut } = useStore();
 
-  function set(key, value) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
-
-  async function submit() {
-    setError("");
-    try {
-      const path = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const result = await api(path, { method: "POST", body: form });
-      await signIn(result.token, result.user);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
+  if (!ready) return <Screen><Text>Opening your account…</Text></Screen>;
 
   if (!user) {
     return (
       <Screen>
-        <Title kicker="Account" sub="Orders, the bag, and the saved list live on your account.">{mode === "login" ? "Sign in" : "Create an account"}</Title>
-        {mode === "register" ? <Field label="Name" value={form.name} onChangeText={(value) => set("name", value)} /> : null}
-        <Field label="Email" value={form.email} onChangeText={(value) => set("email", value)} autoCapitalize="none" />
-        <Field label="Password" value={form.password} onChangeText={(value) => set("password", value)} secureTextEntry />
-        {mode === "register" ? <Field label="Phone" value={form.phone} onChangeText={(value) => set("phone", value)} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button label={mode === "login" ? "Sign in" : "Create account"} onPress={submit} />
-        <Pressable onPress={() => setMode(mode === "login" ? "register" : "login")} style={{ marginTop: 14 }}>
-          <Text style={styles.link}>{mode === "login" ? "New here? Create an account" : "Already registered? Sign in"}</Text>
-        </Pressable>
-        <Text style={styles.hint}>Sample shopper: meera@vijayalakshmi.local / Demo@123</Text>
+        <Title kicker="Account" sub="Orders, the bag, and the saved list live on your account.">Sign in</Title>
+        <View style={{ gap: 10 }}>
+          <Button label="Sign in" onPress={() => navigation.navigate("SignIn", { mode: "login" })} />
+          <Button ghost label="Create an account" onPress={() => navigation.navigate("SignIn", { mode: "register" })} />
+        </View>
+        <Text style={styles.hint}>Sample shopper: meera@vijayalakshmi.local or 8000001002 / Demo@123</Text>
       </Screen>
     );
   }
@@ -49,6 +28,8 @@ export default function AccountScreen({ navigation }) {
       <View style={{ gap: 10 }}>
         <Button label="Saved pieces" onPress={() => navigation.navigate("Wishlist")} />
         <Button ghost label="Orders" onPress={() => navigation.navigate("Orders")} />
+        <Button ghost label="Addresses" onPress={() => navigation.navigate("Addresses")} />
+        <Button ghost label="Your details" onPress={() => navigation.navigate("Profile")} />
         <Button ghost label="Shipping and help" onPress={() => navigation.navigate("Help")} />
         <Button ghost label="Talk to the desk" onPress={() => navigation.navigate("Enquire", { type: "expert" })} />
         <Button ghost label="Sign out" onPress={signOut} />
@@ -58,12 +39,25 @@ export default function AccountScreen({ navigation }) {
 }
 
 export function WishlistScreen({ navigation }) {
-  const { currency } = useStore();
+  const { ready, user, currency } = useStore();
   const [items, setItems] = useState(null);
-  useEffectLoad(async () => {
-    const data = await api("/api/wishlist", { currency });
-    setItems(data.items);
-  });
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    api("/api/wishlist", { currency }).then((data) => {
+      if (live) setItems(data.items);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [user, currency]);
+  if (!ready) return <Screen safe={false}><Text>Opening your account…</Text></Screen>;
+  if (!user) {
+    return (
+      <Screen safe={false}>
+        <Title>Sign in to see saved pieces</Title>
+        <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
+      </Screen>
+    );
+  }
   return (
     <Screen>
       <Title>Saved</Title>
@@ -77,21 +71,35 @@ export function WishlistScreen({ navigation }) {
   );
 }
 
-export function OrdersScreen() {
+export function OrdersScreen({ navigation }) {
+  const { ready, user } = useStore();
   const [items, setItems] = useState([]);
-  useEffectLoad(async () => {
-    const data = await api("/api/orders");
-    setItems(data.items);
-  });
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    api("/api/orders").then((data) => {
+      if (live) setItems(data.items);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [user]);
+  if (!ready) return <Screen safe={false}><Text>Opening your account…</Text></Screen>;
+  if (!user) {
+    return (
+      <Screen safe={false}>
+        <Title>Sign in to see orders</Title>
+        <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
+      </Screen>
+    );
+  }
   return (
     <Screen>
       <Title>Orders</Title>
       {items.map((order) => (
-        <View key={order.id} style={styles.line}>
+        <Pressable key={order.id} style={styles.line} onPress={() => navigation.navigate("Order", { id: order.id })}>
           <Text style={styles.name}>#{order.id} · {order.status}</Text>
           <Text>{order.items.map((item) => item.name).join(", ")}</Text>
-          <Text>{order.symbol}{order.subtotal}</Text>
-        </View>
+          <Text>{order.symbol}{order.total}</Text>
+        </Pressable>
       ))}
     </Screen>
   );
@@ -173,10 +181,6 @@ export function EnquireScreen({ route }) {
   );
 }
 
-function Field(props) {
-  return <TextInput {...props} style={styles.input} placeholderTextColor={colors.muted} />;
-}
-
 function useEffectLoad(loader) {
   useEffect(() => {
     loader().catch(() => {});
@@ -186,7 +190,6 @@ function useEffectLoad(loader) {
 const styles = StyleSheet.create({
   input: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, borderRadius: 10, padding: 10, marginBottom: 8 },
   error: { color: colors.maroon, marginBottom: 8 },
-  link: { color: colors.maroon },
   hint: { color: colors.muted, marginTop: 18 },
   line: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
   name: { fontWeight: "600", color: colors.ink, fontSize: 16 },

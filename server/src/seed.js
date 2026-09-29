@@ -1,4 +1,4 @@
-import { hashPassword } from "./auth.js";
+import { hashPassword, phoneKey } from "./auth.js";
 import { many, one, run, setSetting } from "./db.js";
 
 function category({ parentId = null, slug, name, kind, group = null, description = "", sort = 0 }) {
@@ -58,18 +58,20 @@ export function seed() {
   if (one("SELECT id FROM users LIMIT 1")) return;
 
   run(
-    `INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO users (name, email, phone, phone_key, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)`,
     "Atelier Admin",
     "admin@vijayalakshmi.local",
     "+91 80 0000 1000",
+    phoneKey("+91 80 0000 1000"),
     hashPassword("Admin@123"),
-    "admin",
+    "superadmin",
   );
   const customerId = run(
-    `INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO users (name, email, phone, phone_key, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)`,
     "Meera Rao",
     "meera@vijayalakshmi.local",
     "+91 80 0000 1002",
+    phoneKey("+91 80 0000 1002"),
     hashPassword("Demo@123"),
     "customer",
   ).id;
@@ -658,6 +660,12 @@ export function seed() {
     { city: "Bengaluru", lines: "Vijayalakshmi Gems, 18 Residency Road, Bengaluru 560025" },
     { city: "Jaipur", lines: "Cutting bench, Johari Bazaar lane, Jaipur 302003" },
   ]);
+  setSetting("feature_oracle_cloud", false);
+  setSetting("feature_aws_cloud", false);
+  setSetting("feature_oracle_cloud", false);
+  setSetting("feature_aws_cloud", false);
+  setSetting("feature_oracle_cloud", false);
+  setSetting("feature_aws_cloud", false);
 
   const ruby = one("SELECT id, price_cents FROM products WHERE slug = ?", "mozambique-ruby-2-1ct");
   const orderId = run(
@@ -690,5 +698,11 @@ export function seed() {
     "new",
   );
 
-  many("SELECT id FROM products");
+  const homeShop = one("SELECT id FROM shops ORDER BY id LIMIT 1");
+  if (homeShop) {
+    run("UPDATE products SET shop_id = ? WHERE shop_id IS NULL", homeShop.id);
+    run(`UPDATE enquiries SET shop_id = (
+      SELECT shop_id FROM products WHERE products.id = enquiries.product_id
+    ) WHERE shop_id IS NULL AND product_id IS NOT NULL`);
+  }
 }

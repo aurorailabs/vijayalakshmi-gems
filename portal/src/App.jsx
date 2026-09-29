@@ -1,70 +1,158 @@
 import { useEffect, useState } from "react";
 import { api, getToken, setToken } from "./api.js";
-import { Desk, Enquiries, Orders, Pieces, Recommendations, Resource, Settings, Currencies, Customers } from "./screens.jsx";
+import { Coupons, Customers, Currencies, Dashboard, Desk, Enquiries, Orders, Pieces, Recommendations, Resource, Roles, Settings, ShopProfile, Shops } from "./screens.jsx";
 
-const NAV = [
-  ["desk", "Desk"],
-  ["pieces", "Pieces"],
-  ["categories", "Categories"],
-  ["banners", "Banners"],
-  ["blocks", "Home stories"],
-  ["purposes", "Purposes"],
-  ["rashis", "Rashi windows"],
-  ["filters", "Search filters"],
-  ["reviews", "Reviews"],
-  ["blog", "Journal"],
-  ["pages", "Help pages"],
-  ["currencies", "Currencies"],
-  ["orders", "Orders"],
-  ["enquiries", "Enquiries"],
-  ["recommendations", "Advice requests"],
-  ["customers", "Customers"],
-  ["settings", "Atelier"],
+const SHOP_NAV = [
+  { group: "Today", items: [
+    ["desk", "Overview"],
+    ["orders", "Orders"],
+    ["enquiries", "Messages"],
+  ] },
+  { group: "Catalog", items: [
+    ["pieces", "Products"],
+    ["reviews", "Reviews"],
+  ] },
+  { group: "Money", items: [
+    ["coupons", "Discounts"],
+  ] },
+  { group: "Shop", items: [
+    ["customers", "Customers"],
+    ["settings", "Shop details"],
+  ] },
 ];
+
+const SUPER_NAV = [
+  { group: "", items: [
+    ["dashboard", "Dashboard"],
+    ["shops", "Shop users"],
+    ["roles", "Roles and permissions"],
+  ] },
+];
+
+function visibleNav(profile) {
+  if (!profile) return [];
+  if (profile.role === "superadmin") return SUPER_NAV;
+  const allowed = new Set(profile.menus || []);
+  return SHOP_NAV
+    .map((group) => ({ ...group, items: group.items.filter(([id]) => allowed.has(id)) }))
+    .filter((group) => group.items.length);
+}
+
+function isDeskUser(user) {
+  return user && (user.role === "superadmin" || user.role === "shop");
+}
 
 export default function App() {
   const [token, setAuth] = useState(getToken());
+  const [checking, setChecking] = useState(Boolean(getToken()));
+  const [busy, setBusy] = useState(false);
   const [section, setSection] = useState("desk");
-  const [email, setEmail] = useState("admin@vijayalakshmi.local");
-  const [password, setPassword] = useState("Admin@123");
+  const [profile, setProfile] = useState(null);
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const onLogout = () => setAuth(null);
+    const onLogout = () => {
+      setAuth(null);
+      setProfile(null);
+      setChecking(false);
+    };
     window.addEventListener("vg-logout", onLogout);
     return () => window.removeEventListener("vg-logout", onLogout);
   }, []);
 
+  useEffect(() => {
+    if (!profile) return;
+    const ids = visibleNav(profile).flatMap((group) => group.items.map(([id]) => id));
+    if (ids.length && !ids.includes(section)) setSection(ids[0]);
+  }, [profile, section]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    let live = true;
+    api("/api/auth/me")
+      .then((data) => {
+        if (!live) return;
+        if (!isDeskUser(data.user)) {
+          setToken(null);
+          setAuth(null);
+          setProfile(null);
+          setError("This desk is for shop staff.");
+        } else {
+          setProfile(data.user);
+          if (data.user.role === "superadmin") setSection("dashboard");
+        }
+      })
+      .catch(() => {
+        if (!live) return;
+        setAuth(null);
+      })
+      .finally(() => {
+        if (live) setChecking(false);
+      });
+    return () => { live = false; };
+  }, []);
+
   async function login(event) {
     event.preventDefault();
+    const trimmed = identifier.trim();
+    const digits = trimmed.replace(/\D/g, "");
+    const phoneLength = digits.startsWith("91") && digits.length === 12 ? 10 : digits.replace(/^0/, "").length;
+    if (trimmed.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Enter a valid email.");
+      return;
+    }
+    if (!trimmed.includes("@") && phoneLength < 10) {
+      setError("Enter your email or phone number.");
+      return;
+    }
+    if (!password) {
+      setError("Enter your password.");
+      return;
+    }
     setError("");
+    setBusy(true);
     try {
-      const result = await api("/api/auth/login", { method: "POST", body: { email, password } });
-      if (result.user.role !== "admin") {
-        setError("This desk is for atelier staff.");
+      const result = await api("/api/auth/login", { method: "POST", body: { identifier: trimmed, password } });
+      if (!isDeskUser(result.user)) {
+        setError("This desk is for shop staff.");
         return;
       }
       setToken(result.token);
       setAuth(result.token);
+      setProfile(result.user);
+      setSection(result.user.role === "superadmin" ? "dashboard" : "desk");
+      setPassword("");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusy(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="login-wrap">
+        <p className="muted">Checking the desk session…</p>
+      </main>
+    );
   }
 
   if (!token) {
     return (
       <main className="login-wrap">
         <form className="login-card" onSubmit={login}>
-          <p className="eyebrow">Configuration desk</p>
+          <p className="eyebrow">Shop desk</p>
           <h1>Vijayalakshmi Gems</h1>
           <p className="muted">What you save here is what the mobile app shows.</p>
           <div className="form">
-            <label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" /></label>
-            <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></label>
+            <label>Email or phone<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoComplete="username" required /></label>
+            <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
             {error ? <p className="error">{error}</p> : null}
-            <button className="primary" type="submit">Open the desk</button>
+            <button className="primary" type="submit" disabled={busy}>{busy ? "Opening…" : "Open the desk"}</button>
           </div>
-          <p className="hint">Local staff login: admin@vijayalakshmi.local / Admin@123</p>
+          <p className="hint">Super admin: admin@vijayalakshmi.local or 8000001000 / Admin@123</p>
         </form>
       </main>
     );
@@ -75,31 +163,34 @@ export default function App() {
       <aside className="rail">
         <div className="brand">
           <strong>Vijayalakshmi</strong>
-          <span>Configuration desk</span>
+          <span>{profile?.role === "superadmin" ? "Super admin" : "Shop desk"}</span>
         </div>
-        {NAV.map(([id, label]) => (
-          <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}>{label}</button>
+        {visibleNav(profile).map((group) => (
+          <div key={group.group || "root"}>
+            {group.group ? <p className="nav-group">{group.group}</p> : null}
+            {group.items.map(([id, label]) => (
+              <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}>{label}</button>
+            ))}
+          </div>
         ))}
-        <button className="signout" onClick={() => { setToken(null); setAuth(null); }}>Sign out</button>
+        <button className="signout" onClick={() => { setToken(null); setAuth(null); setProfile(null); }}>Sign out</button>
       </aside>
       <main className="main">
-        {section === "desk" && <Desk />}
-        {section === "pieces" && <Pieces />}
+        {visibleNav(profile).length === 0 ? <p>The super admin has not assigned a menu to this shop yet.</p> : null}
+        {section === "desk" && <Desk role={profile?.role} shopName={profile?.shopName} />}
+        {section === "pieces" && <Pieces features={profile?.features} />}
         {section === "categories" && <Categories />}
-        {section === "banners" && <Banners />}
-        {section === "blocks" && <Blocks />}
-        {section === "purposes" && <Purposes />}
-        {section === "rashis" && <Rashis />}
-        {section === "filters" && <Filters />}
         {section === "reviews" && <Reviews />}
-        {section === "blog" && <Journal />}
-        {section === "pages" && <Pages />}
         {section === "currencies" && <Currencies />}
         {section === "orders" && <Orders />}
+        {section === "coupons" && <Coupons />}
         {section === "enquiries" && <Enquiries />}
         {section === "recommendations" && <Recommendations />}
         {section === "customers" && <Customers />}
-        {section === "settings" && <Settings />}
+        {section === "dashboard" && <Dashboard />}
+        {section === "shops" && <Shops />}
+        {section === "roles" && <Roles />}
+        {section === "settings" && (profile?.role === "shop" ? <ShopProfile /> : <Settings title="App name" intro="The name, phones, and note on the shared phone app. A shop edits its own name under Shop details." />)}
       </main>
     </div>
   );
@@ -108,8 +199,8 @@ export default function App() {
 function Categories() {
   return (
     <Resource
-      title="Categories"
-      intro="Navigation in the app is this tree. A parent such as Gemstones includes every child when a shopper opens it."
+      title="Browse groups"
+      intro="The groups every shop shares, such as Gemstones or Rings. A shop picks one of these when it posts a piece."
       table="categories"
       columns={[["name", "Name"], ["kind", "Kind"], ["groupName", "Group"], ["slug", "Slug"]]}
       fields={(items) => [
@@ -127,115 +218,11 @@ function Categories() {
   );
 }
 
-function Banners() {
-  return (
-    <Resource
-      title="Banners"
-      intro="Home slides. A target such as shop:vault, shop:limited, shop:gemstones, or enquire:custom_design opens that place in the app."
-      table="banners"
-      columns={[["title", "Title"], ["ctaTarget", "Opens"], ["sortOrder", "Sort"]]}
-      fields={[
-        { key: "title", label: "Title" },
-        { key: "subtitle", label: "Subtitle", full: true },
-        { key: "placement", label: "Placement", default: "home" },
-        { key: "ctaLabel", label: "Button" },
-        { key: "ctaTarget", label: "Opens" },
-        { key: "swatch", label: "Colour", type: "color" },
-        { key: "sortOrder", label: "Sort", type: "number" },
-        { key: "active", label: "Active", type: "check" },
-      ]}
-    />
-  );
-}
-
-function Blocks() {
-  return (
-    <Resource
-      title="Home stories"
-      intro="Certified stones, energizing, and the custom-design steps are edited here and rendered on the phone."
-      table="content_blocks"
-      columns={[["title", "Title"], ["groupName", "Group"], ["blockKey", "Key"]]}
-      fields={[
-        { key: "blockKey", label: "Key" },
-        { key: "groupName", label: "Group" },
-        { key: "title", label: "Title", full: true },
-        { key: "body", label: "Body", type: "textarea", full: true },
-        { key: "ctaLabel", label: "Button" },
-        { key: "ctaTarget", label: "Opens" },
-        { key: "sortOrder", label: "Sort", type: "number" },
-        { key: "active", label: "Active", type: "check" },
-      ]}
-    />
-  );
-}
-
-function Purposes() {
-  return (
-    <Resource
-      title="Purposes"
-      intro="The advice screen and the home purpose search use this map. Change the gemstone and the app recommends the new one."
-      table="purposes"
-      columns={[["name", "Purpose"], ["planet", "Planet"], ["gemstone", "Stone"]]}
-      fields={[
-        { key: "name", label: "Name" },
-        { key: "slug", label: "Slug" },
-        { key: "planet", label: "Planet" },
-        { key: "gemstone", label: "Gemstone" },
-        { key: "blurb", label: "Reason", type: "textarea", full: true },
-        { key: "sortOrder", label: "Sort", type: "number" },
-        { key: "active", label: "Active", type: "check" },
-      ]}
-    />
-  );
-}
-
-function Rashis() {
-  return (
-    <Resource
-      title="Rashi windows"
-      intro="Birth dates fall into these windows. The life stone is the gemstone on the matching row."
-      table="rashis"
-      columns={[["name", "Rashi"], ["englishName", "English"], ["gemstone", "Stone"], ["lord", "Lord"]]}
-      fields={[
-        { key: "name", label: "Name" },
-        { key: "englishName", label: "English name" },
-        { key: "lord", label: "Lord" },
-        { key: "gemstone", label: "Gemstone" },
-        { key: "startMonth", label: "Start month", type: "number" },
-        { key: "startDay", label: "Start day", type: "number" },
-        { key: "endMonth", label: "End month", type: "number" },
-        { key: "endDay", label: "End day", type: "number" },
-        { key: "note", label: "Note", type: "textarea", full: true },
-        { key: "sortOrder", label: "Sort", type: "number" },
-      ]}
-    />
-  );
-}
-
-function Filters() {
-  return (
-    <Resource
-      title="Search filters"
-      intro="Carat and price bands are in US dollars. The app converts the labels into the shopper's currency."
-      table="filter_options"
-      columns={[["filterKey", "Filter"], ["label", "Label"], ["matchValue", "Matches"]]}
-      fields={[
-        { key: "filterKey", label: "Filter", type: "select", options: ["carat", "price", "treatment", "origin", "shape", "metal", "certification"] },
-        { key: "label", label: "Label" },
-        { key: "minValue", label: "Minimum", type: "number" },
-        { key: "maxValue", label: "Maximum", type: "number" },
-        { key: "matchValue", label: "Exact match" },
-        { key: "sortOrder", label: "Sort", type: "number" },
-        { key: "active", label: "Active", type: "check" },
-      ]}
-    />
-  );
-}
-
 function Reviews() {
   return (
     <Resource
       title="Reviews"
+      intro="Ratings buyers leave on a product. Publish a review to show it in the app."
       table="reviews"
       columns={[["author", "Author"], ["rating", "Rating"], ["title", "Title"]]}
       fields={[
@@ -249,37 +236,3 @@ function Reviews() {
   );
 }
 
-function Journal() {
-  return (
-    <Resource
-      title="Journal"
-      table="blog_posts"
-      columns={[["title", "Title"], ["slug", "Slug"]]}
-      fields={[
-        { key: "title", label: "Title", full: true },
-        { key: "slug", label: "Slug" },
-        { key: "excerpt", label: "Excerpt", type: "textarea", full: true },
-        { key: "body", label: "Article", type: "textarea", full: true },
-        { key: "published", label: "Published", type: "check" },
-      ]}
-    />
-  );
-}
-
-function Pages() {
-  return (
-    <Resource
-      title="Help pages"
-      table="pages"
-      columns={[["title", "Title"], ["slug", "Slug"]]}
-      fields={[
-        { key: "title", label: "Title" },
-        { key: "slug", label: "Slug" },
-        { key: "body", label: "Body", type: "textarea", full: true },
-        { key: "showInHelp", label: "Show in the app", type: "check" },
-        { key: "sortOrder", label: "Sort", type: "number" },
-        { key: "active", label: "Active", type: "check" },
-      ]}
-    />
-  );
-}
