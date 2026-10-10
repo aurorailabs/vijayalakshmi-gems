@@ -1,6 +1,7 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { money } from "./api";
+import { money, photoUri } from "./api";
+import { useStore } from "./store";
 
 export const colors = {
   ivory: "#f6f1e8",
@@ -25,10 +26,11 @@ export function useShopWidth() {
 export function Screen({ children, safe = true }) {
   const insets = useSafeAreaInsets();
   const { wide } = useShopWidth();
+  const { theme } = useStore();
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: theme?.background || colors.ivory }]}
       contentContainerStyle={[
         styles.content,
         {
@@ -56,13 +58,14 @@ export function Title({ kicker, children, sub }) {
 }
 
 export function Button({ label, onPress, ghost, disabled }) {
+  const { theme } = useStore();
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled }}
-      style={[styles.button, ghost && styles.ghost, disabled && styles.disabled]}
+      style={[styles.button, { backgroundColor: theme?.accent || colors.maroon }, ghost && styles.ghost, disabled && styles.disabled]}
     >
       <Text style={[styles.buttonText, ghost && styles.ghostText]}>{label}</Text>
     </Pressable>
@@ -70,18 +73,20 @@ export function Button({ label, onPress, ghost, disabled }) {
 }
 
 export function GemCard({ item, onPress, width = 168 }) {
+  const { theme } = useStore();
   const mark = item.vault ? "By appointment" : item.limited ? "Limited" : item.stock === 1 ? "One left" : item.carat ? `${item.carat} ct` : "";
+  const photoHeight = Math.round(width * 1.18);
   return (
     <Pressable onPress={onPress} style={[styles.card, { width }]} accessibilityRole="button" accessibilityLabel={`View ${item.name}`}>
-      <View style={[styles.gem, { backgroundColor: item.swatch || colors.maroon, height: Math.round(width * 1.18) }]}>
-        {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.photo} resizeMode="cover" /> : null}
+      <View style={[styles.gem, { backgroundColor: theme?.paper || item.swatch || colors.maroon, height: photoHeight }]}>
+        {item.imageUrl ? <Image source={{ uri: photoUri(item.imageUrl) }} style={{ width, height: photoHeight }} resizeMode="cover" /> : null}
         {mark ? <View style={styles.badge}><Text style={styles.gemMark}>{mark}</Text></View> : null}
       </View>
       <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
       {item.shopName ? <Text style={styles.cardShop} numberOfLines={1}>{item.shopName}</Text> : null}
       <Text style={styles.cardMeta} numberOfLines={1}>{[item.origin, item.certification].filter(Boolean).join(" · ") || item.metal}</Text>
       <View style={styles.priceRow}>
-        <Text style={styles.price}>{money(item)}</Text>
+        <Text style={[styles.price, theme?.accent ? { color: theme.accent } : null]}>{money(item)}</Text>
         {item.compareAt ? <Text style={styles.compare}>{item.symbol}{Math.round(item.compareAt).toLocaleString("en-IN")}</Text> : null}
       </View>
     </Pressable>
@@ -97,6 +102,8 @@ export function openTarget(navigation, target) {
     else if (value === "limited") params.limited = "1";
     else if (value) params.category = value;
     navigation.navigate("Shop", params);
+  } else if (kind === "product" && value) {
+    navigation.navigate("Product", { slug: value });
   } else if (kind === "enquire") {
     navigation.navigate("Enquire", { type: value || "expert" });
   }

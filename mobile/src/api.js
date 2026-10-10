@@ -2,6 +2,12 @@ import { getToken, setToken } from "./session";
 
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4000";
 
+export function photoUri(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return new URL(url, API_URL).toString();
+}
+
 let onUnauthorized = () => {};
 
 export function setUnauthorizedHandler(handler) {

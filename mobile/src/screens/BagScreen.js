@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { api } from "../api";
+import { api, photoUri } from "../api";
 import { useStore } from "../store";
 import { Button, Screen, Title, colors } from "../ui";
 
@@ -22,11 +22,11 @@ export default function BagScreen({ navigation }) {
     setCart(next);
   }
 
-  if (!ready) return <Screen><Text>Opening your bag…</Text></Screen>;
+  if (!ready) return <Screen safe={false}><Text>Opening your bag…</Text></Screen>;
 
   if (!user) {
     return (
-      <Screen>
+      <Screen safe={false}>
         <Title kicker="Bag" sub="The bag is kept on your account, so the price is always the portal price.">Sign in to see your bag</Title>
         <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
       </Screen>
@@ -34,13 +34,13 @@ export default function BagScreen({ navigation }) {
   }
 
   return (
-    <Screen>
+    <Screen safe={false}>
       <Title kicker="Bag">Pieces to take home</Title>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {(cart?.items || []).map((item) => (
         <View key={item.id} style={styles.row}>
           <View style={[styles.thumb, { backgroundColor: item.swatch || colors.maroon }]}>
-            {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+            {item.imageUrl ? <Image source={{ uri: photoUri(item.imageUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{item.name}</Text>

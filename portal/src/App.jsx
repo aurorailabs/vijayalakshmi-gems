@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, formProblem, getToken, setToken } from "./api.js";
+import { BannerDesk } from "./banner.jsx";
 import { Coupons, Customers, Currencies, Dashboard, Desk, Enquiries, Orders, Pieces, Recommendations, Resource, Roles, Settings, ShopProfile, Shops } from "./screens.jsx";
 
 const SHOP_NAV = [
@@ -24,6 +25,7 @@ const SHOP_NAV = [
 const SUPER_NAV = [
   { group: "", items: [
     ["dashboard", "Dashboard"],
+    ["banner", "Banner"],
     ["shops", "Shop users"],
     ["roles", "Roles and permissions"],
   ] },
@@ -197,6 +199,7 @@ export default function App() {
         {section === "recommendations" && <Recommendations />}
         {section === "customers" && <Customers />}
         {section === "dashboard" && <Dashboard />}
+        {section === "banner" && <BannerDesk />}
         {section === "shops" && <Shops />}
         {section === "roles" && <Roles />}
         {section === "settings" && (profile?.role === "shop" ? <ShopProfile /> : <Settings title="App name" intro="The name, phones, and note on the shared phone app. A shop edits its own name under Shop details." />)}

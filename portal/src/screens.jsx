@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, formProblem } from "./api.js";
+import { ShotGallery } from "./uploads.jsx";
 
 function useItems(path) {
   const [items, setItems] = useState([]);
@@ -209,7 +210,7 @@ export function Desk({ role, shopName }) {
 const emptyPiece = {
   name: "", sku: "", slug: "", kind: "loose", categoryId: "", collectionId: "", summary: "", description: "", benefit: "",
   carat: "", shape: "", origin: "", treatment: "", certification: "", metal: "", jewelleryType: "", birthMonth: "",
-  price: "", compareAt: "", stock: 1, swatch: "#7c2432", imageUrl: "", purpose: "", sortOrder: 0,
+  price: "", compareAt: "", stock: 1, swatch: "#7c2432", imageUrl: "", images: [], purpose: "", sortOrder: 0,
   callForPrice: 0, featured: 0, bestseller: 0, limited: 0, vault: 0, active: 1,
 };
 
@@ -238,6 +239,7 @@ export function Pieces({ features = { gemstones: true, jewellery: true } }) {
       compareAt: item.compareCents ? item.compareCents / 100 : "",
       categoryId: item.categoryId || "",
       collectionId: item.collectionId || "",
+      images: (item.images || []).map((image) => ({ url: image.url || "", label: image.label || "", kind: image.kind || "photo" })),
       callForPrice: item.callForPrice ? 1 : 0,
       featured: item.featured ? 1 : 0,
       bestseller: item.bestseller ? 1 : 0,
@@ -337,7 +339,7 @@ export function Pieces({ features = { gemstones: true, jewellery: true } }) {
           <label>Compare-at USD<input type="number" step="0.01" value={draft.compareAt ?? ""} onChange={(e) => set("compareAt", e.target.value)} /></label>
           <label>Stock<input type="number" value={draft.stock} onChange={(e) => set("stock", e.target.value)} /></label>
           <label>Swatch<input value={draft.swatch} onChange={(e) => set("swatch", e.target.value)} /></label>
-          <label className="full">Image URL<input value={draft.imageUrl || ""} onChange={(e) => set("imageUrl", e.target.value)} /></label>
+          <ShotGallery images={draft.images || []} onChange={(images) => set("images", images)} onError={(message) => setProblem(message ? { message } : null)} />
           <div className="checks full">
             {[["callForPrice", "Call for price"], ["featured", "Featured"], ["bestseller", "Bestseller"], ["limited", "Limited"], ["vault", "Vault"], ["active", "Active"]].map(([key, label]) => (
               <label key={key}><input type="checkbox" checked={!!Number(draft[key])} onChange={(e) => set(key, e.target.checked ? 1 : 0)} />{label}</label>

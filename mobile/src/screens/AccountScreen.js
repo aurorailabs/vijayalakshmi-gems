@@ -26,7 +26,8 @@ export default function AccountScreen({ navigation }) {
     <Screen>
       <Title kicker="Account" sub={user.email}>{user.name}</Title>
       <View style={{ gap: 10 }}>
-        <Button label="Saved pieces" onPress={() => navigation.navigate("Wishlist")} />
+        <Button label="Bag" onPress={() => navigation.navigate("Bag")} />
+        <Button ghost label="Saved pieces" onPress={() => navigation.navigate("Wishlist")} />
         <Button ghost label="Orders" onPress={() => navigation.navigate("Orders")} />
         <Button ghost label="Addresses" onPress={() => navigation.navigate("Addresses")} />
         <Button ghost label="Your details" onPress={() => navigation.navigate("Profile")} />
@@ -38,7 +39,7 @@ export default function AccountScreen({ navigation }) {
   );
 }
 
-export function WishlistScreen({ navigation }) {
+export function WishlistScreen({ navigation, route }) {
   const { ready, user, currency } = useStore();
   const [items, setItems] = useState(null);
   useEffect(() => {
@@ -49,17 +50,18 @@ export function WishlistScreen({ navigation }) {
     }).catch(() => {});
     return () => { live = false; };
   }, [user, currency]);
-  if (!ready) return <Screen safe={false}><Text>Opening your account…</Text></Screen>;
+  const asTab = route?.name === "Favourite";
+  if (!ready) return <Screen safe={asTab}><Text>Opening your account…</Text></Screen>;
   if (!user) {
     return (
-      <Screen safe={false}>
+      <Screen safe={asTab}>
         <Title>Sign in to see saved pieces</Title>
         <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
       </Screen>
     );
   }
   return (
-    <Screen>
+    <Screen safe={asTab}>
       <Title>Saved</Title>
       {(items || []).map((item) => (
         <Pressable key={item.id} onPress={() => navigation.navigate("Product", { slug: item.slug })} style={styles.line}>

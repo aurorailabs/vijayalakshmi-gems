@@ -1,8 +1,35 @@
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
-import { api, formProblem, money } from "../api";
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { api, formProblem, money, photoUri } from "../api";
 import { useStore } from "../store";
 import { Button, GemCard, Screen, colors, useShopWidth } from "../ui";
+
+function ProductGallery({ product, wide, width }) {
+  const frames = product.images?.length
+    ? product.images.filter((frame) => frame.url)
+    : product.imageUrl
+      ? [{ url: product.imageUrl, label: "Photo" }]
+      : [];
+  const frameWidth = wide ? Math.min(width * 0.46, 520) : width - 32;
+  if (!frames.length) {
+    return <View style={[styles.hero, { backgroundColor: product.swatch || colors.maroon }, wide && styles.heroWide]} />;
+  }
+  return (
+    <View style={wide ? styles.heroWide : null}>
+      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.gallery}>
+        {frames.map((frame, index) => (
+          <Image
+            key={`${frame.url}-${index}`}
+            source={{ uri: photoUri(frame.url) }}
+            style={[styles.hero, { width: frameWidth }, wide && styles.heroWide]}
+            resizeMode="contain"
+          />
+        ))}
+      </ScrollView>
+      {frames.length > 1 ? <Text style={styles.stock}>{frames.map((frame) => frame.label || "Photo").join("  ·  ")}</Text> : null}
+    </View>
+  );
+}
 
 export default function ProductScreen({ navigation, route }) {
   const { currency, user } = useStore();
@@ -92,9 +119,7 @@ export default function ProductScreen({ navigation, route }) {
   return (
     <Screen safe={false}>
       <View style={wide ? styles.split : null}>
-        <View style={[styles.hero, { backgroundColor: product.swatch || colors.maroon }, wide && styles.heroWide]}>
-          {product.imageUrl ? <Image source={{ uri: product.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
-        </View>
+        <ProductGallery product={product} wide={wide} width={width} />
         <View style={wide ? styles.buy : null}>
           <Text style={styles.kicker}>{product.vault ? "Vault" : product.limited ? "Limited this week" : product.kind === "jewellery" ? "Jewellery" : "Loose stone"}</Text>
           <Text style={styles.name}>{product.name}</Text>
@@ -121,7 +146,7 @@ export default function ProductScreen({ navigation, route }) {
             )}
             <View style={styles.secondary}>
               <Button ghost label={user ? "Save for later" : "Sign in to save"} onPress={wish} />
-              {message === "In your bag." ? <Button ghost label="Go to bag" onPress={() => navigation.navigate("Main", { screen: "Bag" })} /> : null}
+              {message === "In your bag." ? <Button ghost label="Go to bag" onPress={() => navigation.navigate("Bag")} /> : null}
             </View>
           </View>
           <Text style={styles.reassure}>Lab note travels with the stone. Loose stones can return within ten days if they are still unset.</Text>
@@ -180,7 +205,8 @@ export default function ProductScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   split: { flexDirection: "row", gap: 28, alignItems: "flex-start" },
-  hero: { height: 380, borderRadius: 24, overflow: "hidden", marginBottom: 16 },
+  gallery: { marginBottom: 8 },
+  hero: { height: 380, borderRadius: 24, overflow: "hidden", marginBottom: 16, backgroundColor: "#fff" },
   heroWide: { width: "48%", height: 520, marginBottom: 0 },
   buy: { flex: 1 },
   kicker: { color: colors.gold, letterSpacing: 1.3, textTransform: "uppercase", fontSize: 12, fontWeight: "700" },

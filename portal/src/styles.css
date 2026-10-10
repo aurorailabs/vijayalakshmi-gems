@@ -142,8 +142,81 @@ th { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: 
 .split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; align-items: start; }
 .repeat { display: grid; gap: 8px; }
 .repeat-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; }
+.promo-grid { display: grid; gap: 16px; margin-top: 18px; }
+.promo-card { background: #fffaf3; border-radius: 16px; overflow: hidden; border: 1px solid #eadfce; }
+.promo-card.off { opacity: 0.55; }
+.promo-card img, .promo-preview { width: 100%; height: 220px; object-fit: contain; background: #f3eee6; display: block; }
+.promo-missing { height: 160px; display: grid; place-items: center; color: #6d5c4e; background: #f3eee6; }
+.promo-meta { padding: 14px 16px 16px; }
+.promo-meta p { margin: 4px 0 10px; color: #6d5c4e; }
+.promo-preview { border-radius: 12px; }
+.upload-btn { width: fit-content; align-self: end; position: relative; overflow: hidden; }
+.upload-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-btn.is-busy { opacity: 0.55; }
+.shot-list { display: grid; gap: 12px; }
+.shot-head { display: flex; justify-content: space-between; gap: 12px; align-items: end; }
+.shot-row { display: grid; grid-template-columns: 92px 1fr 150px auto; gap: 10px; align-items: end; }
+.shot-row img, .shot-blank { width: 92px; height: 72px; object-fit: contain; background: #f3eee6; border-radius: 8px; }
+.shot-blank { display: grid; place-items: center; font-size: 11px; text-align: center; padding: 6px; }
+.notice { color: #1f6b3a; margin: 0 0 12px; }
+.banner-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) 340px; gap: 18px; align-items: start; }
+.banner-stage { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 22px; align-items: start; }
+.banner-editor { display: grid; gap: 14px; }
+.phone-dock { width: min(420px, 100%); }
+.phone-dock h2 { font-size: 26px; margin: 0 0 6px; }
+.phone-device { margin-top: 12px; border: 8px solid #241910; border-radius: 28px; overflow: hidden; }
+.phone-screen { padding: 18px 16px 8px; display: grid; gap: 16px; }
+.phone-promos, .phone-cards { display: flex; gap: 12px; overflow: auto; padding-bottom: 4px; }
+.phone-promos article { width: 300px; flex: none; border-radius: 22px; overflow: hidden; border: 1px solid #eadfce; }
+.phone-promos img { width: 100%; height: 178px; object-fit: contain; background: #fff; display: block; }
+.phone-promos strong, .phone-ads strong { display: block; padding: 10px 14px 0; font-size: 16px; }
+.phone-promos p { margin: 0; padding: 4px 14px 14px; color: #6d5c4e; font-size: 13px; }
+.phone-ads { display: flex; flex-wrap: wrap; gap: 12px; }
+.phone-ads article { flex: 1 1 150px; border-radius: 18px; overflow: hidden; border: 1px solid #eadfce; }
+.phone-ads img { width: 100%; height: 110px; object-fit: cover; display: block; background: #fff; }
+.phone-ads strong { padding-bottom: 12px; }
+.phone-shelf { display: grid; gap: 10px; }
+.phone-shelf-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.phone-shelf-head strong { font-size: 24px; font-weight: 600; }
+.phone-shelf-head p { margin: 2px 0 0; padding: 0; color: #6d5c4e; font-size: 13px; }
+.phone-shelf-head span { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.phone-gem { margin: 0; width: 156px; flex: none; }
+.phone-gem-photo { position: relative; height: 184px; border-radius: 18px; overflow: hidden; background: #fffaf3; }
+.phone-gem-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.phone-gem-photo em { position: absolute; left: 8px; top: 8px; background: rgba(24, 14, 10, 0.72); color: #fffaf3; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-style: normal; font-weight: 700; }
+.phone-gem figcaption { display: grid; gap: 2px; padding: 8px 2px 0; }
+.phone-gem figcaption strong { font-size: 15px; line-height: 1.25; }
+.phone-shop { color: #8a5a28; font-size: 12px; font-weight: 700; }
+.phone-meta { color: #6d5c4e; font-size: 12px; }
+.phone-gem figcaption b { font-size: 15px; margin-top: 2px; }
+.banner-block h2 { font-size: 26px; margin-bottom: 8px; }
+.banner-block { display: grid; gap: 10px; }
+.banner-block.is-off { opacity: 0.72; }
+.phone-title { font-family: Fraunces, serif; font-size: 28px; }
+.phone-copy { margin: 0; color: #6d5c4e; }
+.phone-icons { display: flex; justify-content: space-around; padding: 12px 8px; font-size: 13px; font-weight: 700; border-top: 1px solid #eadfce; }
+.theme-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.color-field span { display: flex; gap: 8px; align-items: center; }
+.color-field input[type="color"] { width: 46px; height: 42px; padding: 4px; }
+.product-preview { display: flex; gap: 10px; overflow: auto; padding-bottom: 4px; }
+.product-preview figure { margin: 0; width: 120px; flex: none; }
+.product-preview img, .product-preview .promo-missing { width: 120px; height: 140px; object-fit: cover; border-radius: 12px; }
+.product-preview figcaption { margin-top: 6px; font-size: 12px; }
+.phone-frame { width: min(380px, 100%); border: 8px solid #241910; border-radius: 28px; padding: 14px; display: grid; gap: 10px; }
+.phone-header, .phone-footer { display: grid; gap: 4px; }
+.phone-header img, .phone-footer img, .phone-row img { width: 100%; height: 92px; object-fit: cover; border-radius: 12px; background: #fff; }
+.phone-header span { letter-spacing: 0.12em; text-transform: uppercase; font-size: 11px; color: #8a5a28; }
+.phone-row { display: flex; gap: 8px; overflow: auto; }
+.phone-row img { width: 140px; flex: none; }
+.phone-row.ads img { width: 48%; flex: 1; }
+.phone-shelf { display: grid; gap: 6px; }
+.phone-footer { border-radius: 14px; padding: 10px; }
+.phone-footer p { margin: 0; color: #6d5c4e; font-size: 13px; }
 @media (max-width: 980px) {
   .shell { grid-template-columns: 1fr; }
   .rail { position: relative; height: auto; }
-  .cards, .split, .grid-form { grid-template-columns: 1fr; }
+  .cards, .split, .grid-form, .shot-row, .banner-layout, .banner-stage, .theme-row { grid-template-columns: 1fr; }
+  .phone-dock { position: static; }
+  .phone-frame { position: static; }
+  .shot-head { flex-direction: column; align-items: stretch; }
 }

@@ -33,6 +33,31 @@ export async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
+export function pictureSrc(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  const origin = (import.meta.env.VITE_API_URL || "http://localhost:4000").replace(/\/$/, "");
+  return `${origin}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
+export async function uploadImage(file, folder) {
+  const data = await readPicture(file);
+  const stored = await api("/api/admin/uploads", {
+    method: "POST",
+    body: { data, filename: file.name || "image.jpg", folder },
+  });
+  return stored.url;
+}
+
+function readPicture(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("That picture could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function formProblem(err) {
   const message = err?.message || "";
   return { message, field: err?.field || inferField(message) };

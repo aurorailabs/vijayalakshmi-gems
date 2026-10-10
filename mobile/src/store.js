@@ -5,13 +5,25 @@ import { getToken, setToken } from "./session";
 
 const Store = createContext(null);
 
+export const defaultTheme = {
+  background: "#f6f1e8",
+  paper: "#fffaf3",
+  accent: "#7c2432",
+};
+
 export function StoreProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);
   const [currency, setCurrencyState] = useState("USD");
+  const [theme, setTheme] = useState(defaultTheme);
+  const [footer, setFooter] = useState({ home: true, favourite: true, profile: true });
 
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null));
+    api("/api/bootstrap").then((data) => {
+      if (data.screen?.theme) setTheme({ ...defaultTheme, ...data.screen.theme });
+      if (data.screen?.footer) setFooter(data.screen.footer);
+    }).catch(() => {});
     (async () => {
       const saved = await AsyncStorage.getItem("vg_currency");
       if (saved) setCurrencyState(saved);
@@ -49,7 +61,7 @@ export function StoreProvider({ children }) {
   }
 
   return (
-    <Store.Provider value={{ ready, user, currency, setCurrency, signIn, signOut, updateUser }}>
+    <Store.Provider value={{ ready, user, currency, setCurrency, theme, setTheme, footer, setFooter, signIn, signOut, updateUser }}>
       {children}
     </Store.Provider>
   );

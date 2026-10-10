@@ -9,15 +9,17 @@ import BagScreen from "./src/screens/BagScreen";
 import { AddressesScreen, CheckoutScreen, OrderScreen, ProfileScreen } from "./src/screens/CommerceScreens";
 import HomeScreen from "./src/screens/HomeScreen";
 import ProductScreen from "./src/screens/ProductScreen";
-import RecommendScreen from "./src/screens/RecommendScreen";
 import ShopScreen from "./src/screens/ShopScreen";
-import { StoreProvider } from "./src/store";
+import { StoreProvider, useStore } from "./src/store";
 import { colors } from "./src/ui";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function Tabs() {
+  const { theme, footer } = useStore();
+  const icons = footer || {};
+  const anyIcon = icons.home || icons.favourite || icons.profile;
   return (
     <Tab.Navigator
       screenOptions={{
@@ -25,31 +27,29 @@ function Tabs() {
         tabBarIcon: () => null,
         tabBarIconStyle: { display: "none", width: 0, height: 0 },
         tabBarLabelStyle: { fontSize: 13, fontWeight: "600" },
-        tabBarActiveTintColor: colors.maroon,
+        tabBarActiveTintColor: theme.accent || colors.maroon,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.paper, borderTopColor: colors.line },
+        tabBarStyle: { backgroundColor: theme.paper || colors.paper, borderTopColor: colors.line },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Browse" component={ShopScreen} />
-      <Tab.Screen name="Advise" component={RecommendScreen} />
-      <Tab.Screen name="Bag" component={BagScreen} />
-      <Tab.Screen name="Account" component={AccountScreen} />
+      {(icons.home || !anyIcon) ? <Tab.Screen name="Home" component={HomeScreen} /> : null}
+      {icons.favourite ? <Tab.Screen name="Favourite" component={WishlistScreen} /> : null}
+      {icons.profile ? <Tab.Screen name="Profile" component={AccountScreen} /> : null}
     </Tab.Navigator>
   );
 }
 
-export default function App() {
+function Root() {
+  const { theme } = useStore();
   return (
-    <SafeAreaProvider>
-      <StoreProvider>
-        <NavigationContainer>
-          <StatusBar style="dark" />
-          <Stack.Navigator screenOptions={{ headerTintColor: colors.ink, headerStyle: { backgroundColor: colors.ivory } }}>
+    <NavigationContainer>
+      <StatusBar style="dark" />
+      <Stack.Navigator screenOptions={{ headerTintColor: colors.ink, headerStyle: { backgroundColor: theme.background || colors.ivory } }}>
             <Stack.Screen name="Main" component={Tabs} options={{ headerShown: false }} />
             <Stack.Screen name="SignIn" component={AuthScreen} options={{ title: "Sign in" }} />
             <Stack.Screen name="Shop" component={ShopScreen} options={{ title: "Shop" }} />
             <Stack.Screen name="Product" component={ProductScreen} options={{ title: "" }} />
+            <Stack.Screen name="Bag" component={BagScreen} options={{ title: "Bag" }} />
             <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: "Checkout" }} />
             <Stack.Screen name="Wishlist" component={WishlistScreen} options={{ title: "Saved" }} />
             <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: "Orders" }} />
@@ -60,8 +60,16 @@ export default function App() {
             <Stack.Screen name="Page" component={PageScreen} options={{ title: "" }} />
             <Stack.Screen name="Article" component={ArticleScreen} options={{ title: "" }} />
             <Stack.Screen name="Enquire" component={EnquireScreen} options={{ title: "Desk" }} />
-          </Stack.Navigator>
-        </NavigationContainer>
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <StoreProvider>
+        <Root />
       </StoreProvider>
     </SafeAreaProvider>
   );

@@ -1,5 +1,9 @@
 import cors from "cors";
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { imageFromDataUrl, uploadToCloudinary } from "./cloudinary.js";
+import { imagesFor, saveImages } from "./gallery.js";
 import {
   attachUser,
   checkPassword,
@@ -37,7 +41,10 @@ import { buildRecommendation } from "./recommend.js";
 import { seed } from "./seed.js";
 
 const app = express();
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 app.use(cors());
+app.use("/media", express.static(publicDir));
+app.use("/api/admin/uploads", express.json({ limit: "12mb" }));
 app.use(express.json({ limit: "1mb" }));
 app.use(attachUser);
 
@@ -117,6 +124,97 @@ function currencyFrom(req) {
   };
 }
 
+function screenText(settings, key, fallback) {
+  const value = settings[key];
+  return value == null || value === "" ? fallback : String(value);
+}
+
+function screenOn(settings, key) {
+  if (settings[key] === undefined) return true;
+  return settings[key] === true || settings[key] === 1 || settings[key] === "1";
+}
+
+function activeSlides(placements) {
+  const marks = placements.map(() => "?").join(", ");
+  return many(
+    `SELECT * FROM banners WHERE active = 1 AND placement IN (${marks}) ORDER BY sort_order, id`,
+    ...placements,
+  ).map(camel);
+}
+
+function screenPayload(currency, { includeHidden = false } = {}) {
+  const settings = getSettings();
+  const slides = (placements) => (includeHidden
+    ? many(
+      `SELECT * FROM banners WHERE placement IN (${placements.map(() => "?").join(", ")}) ORDER BY active DESC, sort_order, id`,
+      ...placements,
+    ).map(camel)
+    : activeSlides(placements));
+  return {
+    title: {
+      text: screenText(settings, "screen_title", screenText(settings, "header_title", settings.tagline || "Natural stones and jewellery")),
+      show: screenOn(settings, "show_title"),
+    },
+    description: {
+      text: screenText(settings, "screen_description", "Certified gemstones and jewellery, chosen for you."),
+      show: screenOn(settings, "show_description"),
+    },
+    promotions: { show: screenOn(settings, "show_promotions"), items: slides(["promotion", "home"]) },
+    ads: { show: screenOn(settings, "show_ads"), items: slides(["ad"]) },
+    gemstones: {
+      show: screenOn(settings, "show_gemstones"),
+      title: screenText(settings, "gems_title", "Gemstones"),
+      description: screenText(settings, "gems_subtitle", "Loose stones, chosen and certified."),
+      products: listProducts({ kind: "loose" }, currency).slice(0, 8),
+    },
+    jewellery: {
+      show: screenOn(settings, "show_jewellery"),
+      title: screenText(settings, "jewellery_title", "Jewellery"),
+      description: screenText(settings, "jewellery_subtitle", "Rings, pendants, and gold pieces."),
+      products: listProducts({ kind: "jewellery" }, currency).slice(0, 8),
+    },
+    footer: {
+      home: screenOn(settings, "icon_home"),
+      favourite: screenOn(settings, "icon_favourite"),
+      profile: screenOn(settings, "icon_profile"),
+    },
+    theme: {
+      background: screenText(settings, "theme_background", "#f6f1e8"),
+      paper: screenText(settings, "theme_paper", "#fffaf3"),
+      accent: screenText(settings, "theme_accent", "#7c2432"),
+    },
+  };
+}
+
+function saveScreen(body) {
+  const theme = body.theme || {};
+  const title = body.title || {};
+  const description = body.description || {};
+  const gems = body.gemstones || {};
+  const jewellery = body.jewellery || {};
+  const footer = body.footer || {};
+  const color = (value, fallback) => (/^#[0-9a-fA-F]{6}$/.test(String(value || "")) ? String(value) : fallback);
+  const flag = (value) => value === true || value === 1 || value === "1";
+  setSetting("screen_title", String(title.text || "").trim());
+  setSetting("show_title", flag(title.show));
+  setSetting("screen_description", String(description.text || "").trim());
+  setSetting("show_description", flag(description.show));
+  setSetting("show_promotions", flag(body.promotions?.show));
+  setSetting("show_ads", flag(body.ads?.show));
+  setSetting("show_gemstones", flag(gems.show));
+  setSetting("gems_title", String(gems.title || "").trim());
+  setSetting("gems_subtitle", String(gems.description || gems.subtitle || "").trim());
+  setSetting("show_jewellery", flag(jewellery.show));
+  setSetting("jewellery_title", String(jewellery.title || "").trim());
+  setSetting("jewellery_subtitle", String(jewellery.description || jewellery.subtitle || "").trim());
+  setSetting("icon_home", flag(footer.home));
+  setSetting("icon_favourite", flag(footer.favourite));
+  setSetting("icon_profile", flag(footer.profile));
+  setSetting("theme_background", color(theme.background, "#f6f1e8"));
+  setSetting("theme_paper", color(theme.paper, "#fffaf3"));
+  setSetting("theme_accent", color(theme.accent, "#7c2432"));
+}
+
 function money(cents, currency) {
   if (cents == null) return null;
   return Math.round((cents / 100) * currency.rate * 100) / 100;
@@ -145,6 +243,7 @@ function presentProduct(row, currency) {
     stock: row.stock,
     swatch: row.swatch,
     imageUrl: row.image_url || "",
+    images: imagesFor(row.id, row.image_url || ""),
     featured: !!row.is_featured,
     bestseller: !!row.is_bestseller,
     limited: !!row.is_limited,
@@ -440,6 +539,7 @@ app.get("/api/bootstrap", (req, res) => {
     pages: many("SELECT slug, title FROM pages WHERE active = 1 AND show_in_help = 1 ORDER BY sort_order"),
     shops: many("SELECT id, name, slug, city, phone FROM shops WHERE active = 1 ORDER BY name"),
     currency: { code: currency.code, symbol: currency.symbol, rate: currency.rate },
+    screen: screenPayload(currency),
   });
 });
 
@@ -932,6 +1032,17 @@ function adminList(res, sql, ...params) {
   res.json({ items: many(sql, ...params) });
 }
 
+app.get("/api/admin/banner-screen", desk, (req, res) => {
+  if (!isSuper(req.desk)) return res.status(403).json({ error: "Only the super admin can do this." });
+  res.json(screenPayload(currencyFrom(req), { includeHidden: true }));
+});
+
+app.put("/api/admin/banner-screen", desk, (req, res) => {
+  if (!isSuper(req.desk)) return res.status(403).json({ error: "Only the super admin can do this." });
+  saveScreen(req.body || {});
+  res.json(screenPayload(currencyFrom(req), { includeHidden: true }));
+});
+
 app.get("/api/admin/settings", desk, (req, res) => {
   if (!gate(req, res, "settings", { superOnly: true })) return;
   res.json({ settings: getSettings() });
@@ -1272,6 +1383,7 @@ app.post("/api/admin/products", desk, (req, res) => {
     body.active === false ? 0 : 1,
     req.desk.shopId || null,
   ).id;
+  if (Array.isArray(body.images)) saveImages(id, body.images);
   const row = one(`${PRODUCT_SELECT} WHERE p.id = ?`, id);
   res.status(201).json({ product: presentProduct(row, currencyFrom(req)) });
 });
@@ -1328,7 +1440,23 @@ app.patch("/api/admin/products/:id", desk, (req, res) => {
   }
   const keys = Object.keys(mapped);
   run(`UPDATE products SET ${keys.map((key) => `${key} = ?`).join(", ")} WHERE id = ?`, ...keys.map((key) => mapped[key]), id);
+  if (Array.isArray(body.images)) saveImages(id, body.images);
   res.json({ product: presentProduct(one(`${PRODUCT_SELECT} WHERE p.id = ?`, id), currencyFrom(req)) });
+});
+
+app.post("/api/admin/uploads", desk, async (req, res) => {
+  const folder = req.body?.folder === "home" ? "home" : req.body?.folder === "products" ? "products" : "";
+  if (!folder) return res.status(400).json({ error: "Choose a home or product picture." });
+  if (folder === "home" && !isSuper(req.desk)) return res.status(403).json({ error: "Only the super admin can upload home pictures." });
+  if (folder === "products" && !gate(req, res, "pieces")) return;
+  const parsed = imageFromDataUrl(req.body?.data, req.body?.filename);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  try {
+    const stored = await uploadToCloudinary(parsed.buffer, { filename: parsed.filename, folder });
+    res.json(stored);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || "The picture could not be uploaded." });
+  }
 });
 
 app.delete("/api/admin/products/:id", desk, (req, res) => {
@@ -1346,7 +1474,7 @@ const simpleTables = {
     columns: ["parent_id", "slug", "name", "kind", "group_name", "description", "sort_order", "show_in_nav", "active"],
   },
   banners: {
-    columns: ["placement", "title", "subtitle", "cta_label", "cta_target", "swatch", "sort_order", "active"],
+    columns: ["placement", "title", "subtitle", "cta_label", "cta_target", "image_url", "swatch", "sort_order", "active"],
   },
   content_blocks: {
     columns: ["block_key", "group_name", "title", "body", "cta_label", "cta_target", "sort_order", "active"],

@@ -286,6 +286,15 @@ export function migrate() {
     run("UPDATE users SET phone_key = ? WHERE id = ?", key, user.id);
   }
   db.exec(`
+    CREATE TABLE IF NOT EXISTS product_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      url TEXT NOT NULL DEFAULT '',
+      label TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'photo',
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS media (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       storage TEXT NOT NULL,
