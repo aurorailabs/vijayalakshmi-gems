@@ -134,6 +134,49 @@ function screenOn(settings, key) {
   return settings[key] === true || settings[key] === 1 || settings[key] === "1";
 }
 
+function productSlugForSlide(slide) {
+  const target = String(slide.ctaTarget || "");
+  const [kind, value] = target.split(":");
+  if (kind === "product" && value) {
+    const linked = one("SELECT slug FROM products WHERE slug = ? AND active = 1", value);
+    if (linked) return linked.slug;
+  }
+  const skip = new Set(["with", "your", "this", "from", "stone", "stones", "select", "gem", "gems", "gemstone", "gemstones", "the", "and", "for"]);
+  const words = String(slide.title || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !skip.has(word));
+  const products = many(
+    `SELECT p.slug, p.name, IFNULL(c.slug, '') AS category_slug
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     WHERE p.active = 1
+     ORDER BY p.is_featured DESC, p.sort_order, p.id`,
+  );
+  let best = "";
+  let bestScore = 0;
+  for (const product of products) {
+    const name = String(product.name || "").toLowerCase();
+    const nameWords = name.split(/\s+/);
+    let score = 0;
+    for (const word of words) {
+      const stem = word.slice(0, Math.min(word.length, 5));
+      if (name.includes(word) || nameWords.some((part) => part.startsWith(stem) || word.startsWith(part.slice(0, 5)))) score += 1;
+    }
+    if (kind === "shop" && value && product.category_slug === value) score += 2;
+    if (score > bestScore) {
+      bestScore = score;
+      best = product.slug;
+    }
+  }
+  if (bestScore >= 2) return best;
+  if (kind === "shop" && value && !["gemstones", "jewellery", "vault", "limited"].includes(value)) {
+    return products.find((product) => product.category_slug === value)?.slug || "";
+  }
+  return "";
+}
+
 function activeSlides(placements) {
   const marks = placements.map(() => "?").join(", ");
   return many(
@@ -159,8 +202,8 @@ function screenPayload(currency, { includeHidden = false } = {}) {
       text: screenText(settings, "screen_description", "Certified gemstones and jewellery, chosen for you."),
       show: screenOn(settings, "show_description"),
     },
-    promotions: { show: screenOn(settings, "show_promotions"), items: slides(["promotion", "home"]) },
-    ads: { show: screenOn(settings, "show_ads"), items: slides(["ad"]) },
+    promotions: { show: screenOn(settings, "show_promotions"), items: slides(["promotion", "home"]).map((slide) => ({ ...slide, productSlug: productSlugForSlide(slide) })) },
+    ads: { show: screenOn(settings, "show_ads"), items: slides(["ad"]).map((slide) => ({ ...slide, productSlug: productSlugForSlide(slide) })) },
     gemstones: {
       show: screenOn(settings, "show_gemstones"),
       title: screenText(settings, "gems_title", "Gemstones"),

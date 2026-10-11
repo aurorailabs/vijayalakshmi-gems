@@ -39,13 +39,15 @@ export default function BagScreen({ navigation }) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {(cart?.items || []).map((item) => (
         <View key={item.id} style={styles.row}>
-          <View style={[styles.thumb, { backgroundColor: item.swatch || colors.maroon }]}>
-            {item.imageUrl ? <Image source={{ uri: photoUri(item.imageUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.linePrice}>{item.symbol}{item.line}</Text>
-          </View>
+          <Pressable style={styles.piece} onPress={() => item.slug && navigation.navigate("Product", { slug: item.slug })}>
+            <View style={[styles.thumb, { backgroundColor: item.swatch || colors.maroon }]}>
+              {item.imageUrl ? <Image source={{ uri: photoUri(item.imageUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.linePrice}>{item.symbol}{item.line}</Text>
+            </View>
+          </Pressable>
           <Pressable onPress={() => setQty(item.id, item.qty - 1)} style={styles.qty}><Text>-</Text></Pressable>
           <Text>{item.qty}</Text>
           <Pressable onPress={() => setQty(item.id, item.qty + 1)} style={styles.qty}><Text>+</Text></Pressable>
@@ -65,6 +67,7 @@ export default function BagScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  piece: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   thumb: { width: 72, height: 72, borderRadius: 12, overflow: "hidden" },
   linePrice: { color: colors.maroon, fontWeight: "700", marginTop: 4 },
   name: { fontWeight: "600", color: colors.ink },

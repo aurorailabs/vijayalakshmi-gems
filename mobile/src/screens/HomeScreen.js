@@ -29,7 +29,13 @@ export default function HomeScreen({ navigation }) {
   const screen = data.screen;
   const paper = theme.paper || colors.paper;
   const accent = theme.accent || colors.maroon;
-  const openPiece = (item) => navigation.navigate("Product", { slug: item.slug });
+  const openPiece = (item) => {
+    if (item?.slug) navigation.navigate("Product", { slug: item.slug });
+  };
+  const openSlide = (slide) => {
+    if (slide.productSlug) navigation.navigate("Product", { slug: slide.productSlug });
+    else openTarget(navigation, slide.ctaTarget);
+  };
   const promos = (screen.promotions.items || []).filter((item) => item.imageUrl);
   const ads = (screen.ads.items || []).filter((item) => item.imageUrl);
 
@@ -41,7 +47,7 @@ export default function HomeScreen({ navigation }) {
       {screen.promotions.show && promos.length ? (
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.promoScroll}>
           {promos.map((slide) => (
-            <Pressable key={slide.id} onPress={() => openTarget(navigation, slide.ctaTarget)} style={[styles.promo, { backgroundColor: paper }]}>
+            <Pressable key={slide.id} onPress={() => openSlide(slide)} style={[styles.promo, { backgroundColor: paper }]}>
               <Image source={{ uri: photoUri(slide.imageUrl) }} style={styles.promoPhoto} resizeMode="contain" />
               {slide.title ? <Text style={styles.promoTitle}>{slide.title}</Text> : null}
               {slide.subtitle ? <Text style={styles.promoSub}>{slide.subtitle}</Text> : null}
@@ -53,7 +59,7 @@ export default function HomeScreen({ navigation }) {
       {screen.ads.show && ads.length ? (
         <View style={styles.ads}>
           {ads.map((ad) => (
-            <Pressable key={ad.id} onPress={() => openTarget(navigation, ad.ctaTarget)} style={[styles.ad, { backgroundColor: paper }]}>
+            <Pressable key={ad.id} onPress={() => openSlide(ad)} style={[styles.ad, { backgroundColor: paper }]}>
               <Image source={{ uri: photoUri(ad.imageUrl) }} style={styles.adPhoto} resizeMode="cover" />
               {ad.title ? <Text style={styles.adTitle}>{ad.title}</Text> : null}
             </Pressable>
